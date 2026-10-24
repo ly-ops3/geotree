@@ -103,6 +103,18 @@ scripts/                建库与历史迁移辅助
 database/               schema + geo 源数据缓存 + seed
 ```
 
+## 数据来源与许可
+
+本仓库包含第三方地理数据，使用时请遵守其原始许可：
+
+| 数据 | 来源 | 许可 |
+|------|------|------|
+| GeoNames gazetteer / alternateNames | [geonames.org](https://www.geonames.org) | [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)（需署名） |
+| CLDR 行政区中文名 | [unicode-org/cldr-json](https://github.com/unicode-org/cldr-json) | Unicode License |
+| ok_zh 国内区划（至街镇） | 第三方整理数据（MySQL dump） | 出处未明，公开分发前请确认可再分发性 |
+
+代码本体采用 [MIT](LICENSE)。
+
 ## 附录：从 moments_pro 迁入
 
 若你的地理表还在旧库（如 `moments_pro`）里：
