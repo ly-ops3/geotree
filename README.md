@@ -50,9 +50,10 @@ python scripts/geo/import_all.py --profile standard
 | 路径 | 说明 | 是否入库 |
 |------|------|----------|
 | `database/geo/` | GeoNames dump、`zh_altnames.sqlite`（中文别名索引，随仓库分发）、CLDR 区划中文名 | 部分入库 |
+| `database/seed/geo_places.dump` | 主表完整 dump（`pg_dump -Fc` 压缩格式，~21MB）。用法：`pg_restore -U postgres -d geo_registry --clean --if-exists geo_places.dump` | 入库 |
 | `database/seed/ok_zh_level4.pgdump.sql` | 国内区划种子（**PG 原生 dump**，`psql -f` 直接导入） | 入库 |
 | `database/seed/ok_zh_level4.sql` | 同一份数据的 MySQL 方言原始备份（历史来源，参考用） | 入库 |
-| `database/backups/` | 本地全量/大表 dump（如 `geo_places.dump`） | 整个目录 gitignore |
+| `database/backups/` | 本地临时备份目录 | 整个目录 gitignore |
 | `database/schema.postgresql.sql` | 全量 DDL，空库自动执行 | 入库 |
 
 ## API
@@ -68,39 +69,26 @@ python scripts/geo/import_all.py --profile standard
 | `GET /api/places/{id}/path` | 面包屑（推荐） |
 | `POST /api/places/validate` | 写入前校验 `place_id` |
 
-## 数据分发与服务器部署
+## 服务器部署
 
-`geo_places` 主表 dump（约 20MB，`pg_dump -Fc` 产物）**不进 git**，推荐两条分发路径：
-
-**方式 A：GitHub Release 附件（公开仓库推荐）**
-
-```bash
-# 本地导出（一次）
-pg_dump -U postgres -d geo_registry -t geo_places -Fc -f geo_places.dump
-# 挂到 Release（v0.1.0 之类）后，服务器侧：
-curl -LO https://github.com/<you>/geo-registry/releases/download/<tag>/geo_places.dump
-pg_restore -U postgres -d geo_registry --clean --if-exists geo_places.dump
-```
-
-**方式 B：直接 scp 私传**
-
-```bash
-scp database/backups/geo_places.dump user@server:~/
-pg_restore -U postgres -d geo_registry --clean --if-exists geo_places.dump
-```
-
-服务器部署全流程（数据库连接走环境变量，不落盘密码）：
+全部种子随仓库分发，clone 即有（数据库连接走环境变量，不落盘密码）：
 
 ```bash
 git clone <repo> && cd geo-registry
 pip install -r requirements.txt
+createdb -U postgres geo_registry
 export GEO_DB_DSN='postgresql://postgres@127.0.0.1:5432/geo_registry'
-psql -d geo_registry -f database/seed/ok_zh_level4.pgdump.sql   # 国内区划种子
-pg_restore -d geo_registry geo_places.dump    # 上一步拿到的 dump
-python app.py                                 # /health → geo_ready: true
+
+# 灌入种子数据（都在 database/seed/）
+psql -U postgres -d geo_registry -f database/seed/ok_zh_level4.pgdump.sql
+pg_restore -U postgres -d geo_registry --clean --if-exists database/seed/geo_places.dump
+
+python app.py   # /health → geo_ready: true
 ```
 
-没有现成 dump 时，`python scripts/geo/import_all.py --profile standard` 可从 GeoNames 全量重建（耗时长）。
+种子更新方式：数据有变动后重新导出并提交——
+`pg_dump -U postgres -d geo_registry -t geo_places -Fc -f database/seed/geo_places.dump`。
+也可以完全不用种子，用 `python scripts/geo/import_all.py --profile standard` 从 GeoNames 全量重建（耗时长）。
 
 ## 目录结构
 
