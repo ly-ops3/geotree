@@ -10,7 +10,10 @@ database/geo/*
 # 一次性导入种子（ok_zh_level4.sql 已入库随仓库分发）
 database/seed/*.sql
 !database/seed/ok_zh_level4.sql
-database/backups/*.sql
+!database/seed/ok_zh_level4.pgdump.sql
+
+# 本地整库/单表备份（不进仓库；部署分发走 Release 附件）
+database/backups/
 
 __pycache__/
 *.pyc

@@ -49,8 +49,10 @@ python scripts/geo/import_all.py --profile standard
 
 | 路径 | 说明 | 是否入库 |
 |------|------|----------|
-| `database/geo/` | GeoNames dump、`zh_altnames.sqlite`（中文别名索引）、CLDR 区划中文名 | 默认 gitignore，`import_all.py` 可重新下载，或 `data_dir` 指向外部目录 |
-| `database/seed/ok_zh_level4.sql` | 国内区划种子备份（**MySQL 方言 dump**，导入 PG 需转换类型；也可用 `migrate_from_moments.py` 从旧库直接复制） | 入库 |
+| `database/geo/` | GeoNames dump、`zh_altnames.sqlite`（中文别名索引，随仓库分发）、CLDR 区划中文名 | 部分入库 |
+| `database/seed/ok_zh_level4.pgdump.sql` | 国内区划种子（**PG 原生 dump**，`psql -f` 直接导入） | 入库 |
+| `database/seed/ok_zh_level4.sql` | 同一份数据的 MySQL 方言原始备份（历史来源，参考用） | 入库 |
+| `database/backups/` | 本地全量/大表 dump（如 `geo_places.dump`） | 整个目录 gitignore |
 | `database/schema.postgresql.sql` | 全量 DDL，空库自动执行 | 入库 |
 
 ## API
@@ -65,6 +67,40 @@ python scripts/geo/import_all.py --profile standard
 | `GET /api/places/{id}` | 单条元数据 |
 | `GET /api/places/{id}/path` | 面包屑（推荐） |
 | `POST /api/places/validate` | 写入前校验 `place_id` |
+
+## 数据分发与服务器部署
+
+`geo_places` 主表 dump（约 20MB，`pg_dump -Fc` 产物）**不进 git**，推荐两条分发路径：
+
+**方式 A：GitHub Release 附件（公开仓库推荐）**
+
+```bash
+# 本地导出（一次）
+pg_dump -U postgres -d geo_registry -t geo_places -Fc -f geo_places.dump
+# 挂到 Release（v0.1.0 之类）后，服务器侧：
+curl -LO https://github.com/<you>/geo-registry/releases/download/<tag>/geo_places.dump
+pg_restore -U postgres -d geo_registry --clean --if-exists geo_places.dump
+```
+
+**方式 B：直接 scp 私传**
+
+```bash
+scp database/backups/geo_places.dump user@server:~/
+pg_restore -U postgres -d geo_registry --clean --if-exists geo_places.dump
+```
+
+服务器部署全流程（数据库连接走环境变量，不落盘密码）：
+
+```bash
+git clone <repo> && cd geo-registry
+pip install -r requirements.txt
+export GEO_DB_DSN='postgresql://postgres@127.0.0.1:5432/geo_registry'
+psql -d geo_registry -f database/seed/ok_zh_level4.pgdump.sql   # 国内区划种子
+pg_restore -d geo_registry geo_places.dump    # 上一步拿到的 dump
+python app.py                                 # /health → geo_ready: true
+```
+
+没有现成 dump 时，`python scripts/geo/import_all.py --profile standard` 可从 GeoNames 全量重建（耗时长）。
 
 ## 目录结构
 
