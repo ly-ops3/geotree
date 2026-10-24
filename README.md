@@ -50,7 +50,7 @@ python scripts/geo/import_all.py --profile standard
 | 路径 | 说明 | 是否入库 |
 |------|------|----------|
 | `database/geo/` | GeoNames dump、`zh_altnames.sqlite`（中文别名索引）、CLDR 区划中文名 | 默认 gitignore，`import_all.py` 可重新下载，或 `data_dir` 指向外部目录 |
-| `database/seed/ok_zh_level4.sql` | 国内区划种子备份（`pg_restore`/psql 导入 `ok_zh_level4` 表用） | gitignore，由你自己保管或重新导出 |
+| `database/seed/ok_zh_level4.sql` | 国内区划种子备份（**MySQL 方言 dump**，导入 PG 需转换类型；也可用 `migrate_from_moments.py` 从旧库直接复制） | 入库 |
 | `database/schema.postgresql.sql` | 全量 DDL，空库自动执行 | 入库 |
 
 ## API

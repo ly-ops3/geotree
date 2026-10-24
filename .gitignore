@@ -1,13 +1,15 @@
 # 本机配置（含数据库密码，勿提交）
 config.json
 
-# GeoNames 源数据/缓存（体积大，可用 import_all.py 重新下载或自备）
+# GeoNames 源数据/缓存（可用 import_all.py 重新下载；zh_altnames 已入库随仓库分发）
 database/geo/
 !database/geo/README.txt
 !database/geo/cldr_subdivisions_zh.json
+!database/geo/zh_altnames.sqlite
 
-# 一次性导入种子（数据以 PG 库为准）
+# 一次性导入种子（ok_zh_level4.sql 已入库随仓库分发）
 database/seed/*.sql
+!database/seed/ok_zh_level4.sql
 database/backups/*.sql
 
 __pycache__/
