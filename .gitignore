@@ -2,7 +2,7 @@
 config.json
 
 # GeoNames 源数据/缓存（可用 import_all.py 重新下载；zh_altnames 已入库随仓库分发）
-database/geo/
+database/geo/*
 !database/geo/README.txt
 !database/geo/cldr_subdivisions_zh.json
 !database/geo/zh_altnames.sqlite
