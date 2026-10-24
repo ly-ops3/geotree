@@ -7,6 +7,7 @@ import re
 from app.db import _table_exists
 from app.geo.admin1_zh import admin1_zh
 from app.geo.country_zh import COUNTRY_ALIASES, COUNTRY_ZH, country_zh
+from app.geo.languages import language_fallbacks
 from app.geo.macro_regions import LEVEL_MACRO, SOURCE_MACRO
 
 ADMIN_SUFFIXES = (
@@ -89,6 +90,7 @@ def _serialize_place_row(db, row):
         'name_zh': row.get('name_zh'),
         'name_en': row.get('name_en'),
         'name_local': row.get('name_local'),
+        'name_local_lang': row.get('name_local_lang'),
         'iso_country': row.get('iso_country'),
         'population': row.get('population'),
         'feature': row.get('admin2_code') if (row.get('level') or 0) >= 8 else None,
@@ -486,3 +488,98 @@ def lookup_country_zh(iso2, fallback_en=None):
 
 def lookup_admin1_zh(admin1_code, fallback_en=None):
     return admin1_zh(admin1_code, fallback_en)
+
+
+def list_languages(db):
+    if not _table_exists(db, 'geo_languages'):
+        return []
+    rows = db.execute(
+        'SELECT code, iso639, name_en FROM geo_languages ORDER BY code'
+    ).fetchall()
+    return [
+        {'code': row['code'], 'iso639': row['iso639'], 'name_en': row['name_en']}
+        for row in rows
+    ]
+
+
+def list_place_names(db, place_id):
+    if not place_id or not _table_exists(db, 'geo_place_names'):
+        return []
+    rows = db.execute(
+        '''SELECT n.lang_code, n.name, n.is_preferred, l.name_en AS language_en
+           FROM geo_place_names n
+           LEFT JOIN geo_languages l ON l.code = n.lang_code
+           WHERE n.place_id = ?
+           ORDER BY n.lang_code''',
+        (place_id,),
+    ).fetchall()
+    return [
+        {
+            'lang': row['lang_code'],
+            'name': row['name'],
+            'preferred': bool(row['is_preferred']),
+            'language_en': row['language_en'],
+        }
+        for row in rows
+    ]
+
+
+def _apply_localized_display(item):
+    localized = (item.get('name_in_lang') or '').strip()
+    if not localized:
+        return
+    anchor = (item.get('name_local') or item.get('name_en') or '').strip()
+    if anchor and anchor != localized:
+        item['display_name'] = f'{localized} ({anchor})'
+    else:
+        item['display_name'] = localized
+
+
+def localize_items(db, items, lang):
+    """按请求语种填 name_in_lang，并只在传入 lang 时改 display_name。"""
+    if not lang or not items or not _table_exists(db, 'geo_place_names'):
+        return items
+    codes = language_fallbacks(lang)
+    if not codes:
+        return items
+    nodes = []
+    for item in items:
+        if not item:
+            continue
+        nodes.append(item)
+        for node in item.get('path') or []:
+            if node is not item:
+                nodes.append(node)
+    ids = list({node['id'] for node in nodes if node.get('id')})
+    if not ids:
+        return items
+    id_marks = ','.join('?' for _ in ids)
+    code_marks = ','.join('?' for _ in codes)
+    rows = db.execute(
+        f'''SELECT place_id, lang_code, name FROM geo_place_names
+            WHERE place_id IN ({id_marks}) AND lang_code IN ({code_marks})''',
+        [*ids, *codes],
+    ).fetchall()
+    rank = {code: index for index, code in enumerate(codes)}
+    best = {}
+    for row in rows:
+        prev = best.get(row['place_id'])
+        if prev is None or rank[row['lang_code']] < rank[prev[0]]:
+            best[row['place_id']] = (row['lang_code'], row['name'])
+    for node in nodes:
+        hit = best.get(node.get('id'))
+        if not hit:
+            continue
+        node['name_in_lang'] = hit[1]
+        node['name_in_lang_code'] = hit[0]
+        _apply_localized_display(node)
+    for item in items:
+        path = item.get('path') if item else None
+        if not path:
+            continue
+        item['path_label'] = ' · '.join(
+            node['display_name'] for node in path[:-1]
+            if node.get('source') != 'macro'
+            and not (node.get('is_administrative') and node.get('has_siblings') is False)
+        )
+    return items

@@ -36,11 +36,65 @@ def apply_schema(db):
     return True
 
 
+def _column_exists(db, table, column):
+    row = db.execute(
+        '''SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = ? AND column_name = ?
+           LIMIT 1''',
+        (table, column),
+    ).fetchone()
+    return row is not None
+
+
+def _ensure_local_name_schema(db):
+    """已有库补上语种表、name_local_lang、多语言名称表。新库的 canonical DDL 已包含。"""
+    db.execute(
+        '''CREATE TABLE IF NOT EXISTS geo_languages (
+            code TEXT PRIMARY KEY,
+            iso639 TEXT NOT NULL,
+            name_en TEXT
+        )'''
+    )
+    if _table_exists(db, 'geo_places') and not _column_exists(db, 'geo_places', 'name_local_lang'):
+        db.execute('ALTER TABLE geo_places ADD COLUMN name_local_lang TEXT')
+    db.execute(
+        '''CREATE TABLE IF NOT EXISTS geo_place_names (
+            place_id BIGINT NOT NULL REFERENCES geo_places(id) ON DELETE CASCADE,
+            lang_code TEXT NOT NULL REFERENCES geo_languages(code),
+            name TEXT NOT NULL,
+            is_preferred BOOLEAN NOT NULL DEFAULT FALSE,
+            PRIMARY KEY (place_id, lang_code)
+        )'''
+    )
+    fk = db.execute(
+        '''SELECT 1
+           FROM pg_constraint c
+           JOIN pg_class t ON c.conrelid = t.oid
+           JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY (c.conkey)
+           WHERE t.relname = 'geo_places'
+             AND a.attname = 'name_local_lang'
+             AND c.contype = 'f'
+           LIMIT 1'''
+    ).fetchone()
+    if not fk and _column_exists(db, 'geo_places', 'name_local_lang'):
+        db.execute(
+            '''ALTER TABLE geo_places
+               ADD CONSTRAINT geo_places_name_local_lang_fkey
+               FOREIGN KEY (name_local_lang) REFERENCES geo_languages(code)'''
+        )
+    db.execute(
+        '''INSERT INTO geo_languages (code, iso639, name_en) VALUES
+           ('zh', 'zh', 'Chinese'),
+           ('en', 'en', 'English')
+           ON CONFLICT (code) DO NOTHING'''
+    )
+    db.commit()
+
+
 def ensure_geo_places_schema(db):
     """确保 geo 字典表存在（导入脚本与启动时调用）。"""
     if not _table_exists(db, 'geo_places'):
         apply_schema(db)
-        return
     if not _table_exists(db, 'ok_zh_level4'):
         db.execute(
             '''CREATE TABLE ok_zh_level4 (
@@ -55,6 +109,7 @@ def ensure_geo_places_schema(db):
         )
         db.commit()
     _ensure_geo_places_unique(db)
+    _ensure_local_name_schema(db)
 
 
 def _ensure_geo_places_unique(db):

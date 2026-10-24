@@ -3,6 +3,7 @@
 from flask import Blueprint, request
 
 from app.db import get_db
+from app.geo.languages import canonicalize_lang
 from app.geo.places import (
     SCOPE_ABROAD,
     SCOPE_CN,
@@ -12,6 +13,9 @@ from app.geo.places import (
     get_children,
     get_geo_stats,
     get_place,
+    list_languages,
+    list_place_names,
+    localize_items,
     place_scope,
     search_places,
     validate_place_for_profile,
@@ -30,6 +34,16 @@ def _geo_not_ready():
     return api_error('地理数据尚未导入，请运行 scripts/geo/import_all.py', status=503, code='ERR_GEO_NOT_READY')
 
 
+def _requested_lang():
+    raw = (request.args.get('lang') or '').strip()
+    if not raw:
+        return None, None
+    code = canonicalize_lang(raw)
+    if not code:
+        return None, api_error('lang 须为语言代码，例如 ja、zh-CN', code='ERR_INVALID_PARAM')
+    return code, None
+
+
 def _parse_search_request():
     q = request.args.get('q', '')
     scope = (request.args.get('scope') or '').strip().lower() or None
@@ -43,11 +57,25 @@ def _parse_search_request():
 
 
 def _places_search_response(db):
+    lang, err = _requested_lang()
+    if err:
+        return err
     try:
         result = search(db, request.args, place_display_name)
     except SearchError as exc:
         return api_error(str(exc), status=400, code='ERR_GEO_QUERY')
+    if lang:
+        localize_items(db, result.get('items') or [], lang)
     return api_success(result, legacy=result)
+
+
+@geo_bp.route('/languages', methods=['GET'])
+def geo_languages():
+    db = get_db()
+    if not geo_tables_ready(db):
+        return _geo_not_ready()
+    items = list_languages(db)
+    return api_success({'items': items}, legacy={'items': items})
 
 
 @geo_bp.route('/stats', methods=['GET'])
@@ -80,7 +108,12 @@ def list_regions():
     elif not scope:
         return api_error('根节点须指定 scope=cn、abroad 或 cn_gn', code='ERR_INVALID_PARAM')
 
+    lang, err = _requested_lang()
+    if err:
+        return err
     items = get_children(db, parent_id=parent_id, scope=scope or None)
+    if lang:
+        localize_items(db, items, lang)
     return api_success({'items': items}, legacy={'items': items})
 
 
@@ -89,9 +122,14 @@ def region_path(place_id):
     db = get_db()
     if not geo_tables_ready(db):
         return _geo_not_ready()
+    lang, err = _requested_lang()
+    if err:
+        return err
     path = get_breadcrumb(db, place_id)
     if not path:
         return api_error('地区不存在', status=404, code='ERR_NOT_FOUND')
+    if lang:
+        localize_items(db, path, lang)
     return api_success({'path': path}, legacy={'path': path})
 
 
@@ -117,9 +155,15 @@ def place_detail(place_id):
     db = get_db()
     if not geo_tables_ready(db):
         return _geo_not_ready()
+    lang, err = _requested_lang()
+    if err:
+        return err
     item = get_place(db, place_id)
     if not item:
         return api_error('地区不存在', status=404, code='ERR_NOT_FOUND')
+    if lang:
+        localize_items(db, [item], lang)
+    item['names'] = list_place_names(db, place_id)
     return api_success({'place': item}, legacy={'place': item})
 
 
@@ -128,9 +172,14 @@ def place_path(place_id):
     db = get_db()
     if not geo_tables_ready(db):
         return _geo_not_ready()
+    lang, err = _requested_lang()
+    if err:
+        return err
     path = get_breadcrumb(db, place_id)
     if not path:
         return api_error('地区不存在', status=404, code='ERR_NOT_FOUND')
+    if lang:
+        localize_items(db, path, lang)
     return api_success({'path': path}, legacy={'path': path})
 
 

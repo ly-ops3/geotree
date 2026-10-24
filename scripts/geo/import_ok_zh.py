@@ -47,15 +47,17 @@ def import_ok_zh(db, selectable_max_deep=3):
         ).fetchone()
         cur = db.execute(
             '''INSERT INTO geo_places
-               (parent_id, level, source, source_id, iso_country, name_zh, name_en, pinyin,
-                deep_legacy, is_selectable, sort_key)
-               VALUES (?, ?, 'ok_zh', ?, 'CN', ?, ?, ?, ?, ?, ?)
+               (parent_id, level, source, source_id, iso_country, name_zh, name_en, name_local,
+                name_local_lang, pinyin, deep_legacy, is_selectable, sort_key)
+               VALUES (?, ?, 'ok_zh', ?, 'CN', ?, ?, ?, 'zh', ?, ?, ?, ?)
                ON CONFLICT (source, source_id) DO UPDATE SET
                  parent_id=EXCLUDED.parent_id,
                  level=EXCLUDED.level,
                  iso_country=EXCLUDED.iso_country,
                  name_zh=EXCLUDED.name_zh,
                  name_en=EXCLUDED.name_en,
+                 name_local=EXCLUDED.name_local,
+                 name_local_lang=EXCLUDED.name_local_lang,
                  pinyin=EXCLUDED.pinyin,
                  deep_legacy=EXCLUDED.deep_legacy,
                  is_selectable=EXCLUDED.is_selectable,
@@ -67,6 +69,7 @@ def import_ok_zh(db, selectable_max_deep=3):
                 str(ok_id),
                 name_zh,
                 row.get('name'),
+                name_zh,
                 row.get('pinyin'),
                 deep,
                 is_selectable,

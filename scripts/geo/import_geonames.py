@@ -231,12 +231,13 @@ def _name_sort_key(name_zh, name_en):
 
 
 def _upsert_place(db, *, parent_id, level, source_id, iso_country, admin1_code, admin2_code,
-                  name_en, name_zh, name_local, population, is_selectable, sort_key, source='geonames'):
+                  name_en, name_zh, name_local, population, is_selectable, sort_key, source='geonames',
+                  name_local_lang=None):
     cur = db.execute(
         '''INSERT INTO geo_places
            (parent_id, level, source, source_id, iso_country, admin1_code, admin2_code,
-            name_en, name_zh, name_local, population, is_selectable, sort_key)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            name_en, name_zh, name_local, name_local_lang, population, is_selectable, sort_key)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (source, source_id) DO UPDATE SET
              parent_id=EXCLUDED.parent_id,
              level=EXCLUDED.level,
@@ -245,7 +246,8 @@ def _upsert_place(db, *, parent_id, level, source_id, iso_country, admin1_code, 
              admin2_code=EXCLUDED.admin2_code,
              name_en=EXCLUDED.name_en,
              name_zh=EXCLUDED.name_zh,
-             name_local=EXCLUDED.name_local,
+             name_local=COALESCE(EXCLUDED.name_local, geo_places.name_local),
+             name_local_lang=COALESCE(EXCLUDED.name_local_lang, geo_places.name_local_lang),
              population=EXCLUDED.population,
              is_selectable=EXCLUDED.is_selectable,
              sort_key=EXCLUDED.sort_key
@@ -261,6 +263,7 @@ def _upsert_place(db, *, parent_id, level, source_id, iso_country, admin1_code, 
             name_en,
             name_zh,
             name_local,
+            name_local_lang,
             population,
             is_selectable,
             sort_key,

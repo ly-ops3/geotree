@@ -35,21 +35,33 @@ def _upsert_macro(db, *, parent_id, iso2, macro_key, name_zh, name_en, sort_key,
             (SOURCE_MACRO, sid),
         ).fetchone()
         return row['id'] if row else -1
+    if iso2 == 'CN':
+        name_local, name_local_lang = name_zh, 'zh'
+    elif iso2 == 'US':
+        name_local, name_local_lang = name_en, 'en'
+    else:
+        # 日本大区目前只有中文译名和罗马字，不是假名，不假装它是当地名称。
+        name_local, name_local_lang = None, None
     cur = db.execute(
         '''INSERT INTO geo_places
            (parent_id, level, source, source_id, iso_country, name_zh, name_en,
-            is_selectable, sort_key)
-           VALUES (?, ?, ?, ?, ?, ?, ?, FALSE, ?)
+            name_local, name_local_lang, is_selectable, sort_key)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, ?)
            ON CONFLICT (source, source_id) DO UPDATE SET
              parent_id=EXCLUDED.parent_id,
              level=EXCLUDED.level,
              iso_country=EXCLUDED.iso_country,
              name_zh=EXCLUDED.name_zh,
              name_en=EXCLUDED.name_en,
+             name_local=COALESCE(EXCLUDED.name_local, geo_places.name_local),
+             name_local_lang=COALESCE(EXCLUDED.name_local_lang, geo_places.name_local_lang),
              is_selectable=EXCLUDED.is_selectable,
              sort_key=EXCLUDED.sort_key
            RETURNING id''',
-        (parent_id, LEVEL_MACRO, SOURCE_MACRO, sid, iso2, name_zh, name_en, sort_key),
+        (
+            parent_id, LEVEL_MACRO, SOURCE_MACRO, sid, iso2, name_zh, name_en,
+            name_local, name_local_lang, sort_key,
+        ),
     )
     geo_id = cur.lastrowid
     if geo_id is None:
