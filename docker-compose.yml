@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: geo_registry
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d geo_registry"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # 一次性灌入 seed（ok_zh_level4 + geo_places），成功后退出
+  seed:
+    image: postgres:18-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./database/seed:/seed:ro
+    command:
+      - sh
+      - -c
+      - |
+        export PGPASSWORD=postgres
+        psql -h db -U postgres -d geo_registry -f /seed/ok_zh_level4.pgdump.sql
+        pg_restore -h db -U postgres -d geo_registry --clean --if-exists /seed/geo_places.dump
+    restart: "no"
+
+  api:
+    build: .
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment:
+      GEO_DB_DSN: postgresql://postgres:postgres@db:5432/geo_registry
+    ports:
+      - "5010:5010"
+
+volumes:
+  pgdata:

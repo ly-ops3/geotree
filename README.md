@@ -1,5 +1,7 @@
 # Geo Registry
 
+[English](README_EN.md)
+
 独立的全球地理名称库服务（Flask + PostgreSQL）：一棵 `geo_places` 树承载
 GeoNames 全球区划 + ok_zh 国内区划（到街镇）+ 大区映射，
 对外提供统一的 `place_id`、级联浏览、中英文搜索与自由文本解析 API。
@@ -71,6 +73,15 @@ python scripts/geo/import_all.py --profile standard
 
 ## 服务器部署
 
+### Docker（推荐）
+
+```bash
+docker compose up --build
+# postgres:18 + 一次性 seed 灌库 + API 自动起在 http://127.0.0.1:5010
+```
+
+### 裸机
+
 全部种子随仓库分发，clone 即有（数据库连接走环境变量，不落盘密码）：
 
 ```bash
@@ -128,3 +139,26 @@ python app.py   # /health → geo_ready: true
 
 迁移收尾（手动迁移完成后）：`python scripts/finish_migration.py`
 会清理废弃表、同步序列并核对旧库已无本地地理表。
+
+## 多语言一句话
+
+> **English** — Self-hosted place-name registry: GeoNames worldwide + China divisions down to street level, unified `place_id`, bilingual EN/ZH search.
+>
+> **Français** — Registre de noms de lieux auto-hébergé : GeoNames mondial + divisions administratives chinoises jusqu'au niveau rue, `place_id` unifié, recherche bilingue EN/ZH.
+>
+> **Deutsch** — Selbst gehosteter Ortsnamen-Dienst: GeoNames weltweit + chinesische Verwaltungseinheiten bis zur Straßenebene, einheitliche `place_id`, zweisprachige EN/ZH-Suche.
+>
+> **Español** — Registro de topónimos autoalojado: GeoNames mundial + divisiones administrativas de China hasta nivel calle, `place_id` unificado, búsqueda bilingüe EN/ZH.
+>
+> **Português** — Registro de topônimos auto-hospedado: GeoNames mundial + divisões administrativas da China até nível de rua, `place_id` unificado, busca bilíngue EN/ZH.
+>
+> **Italiano** — Registro di toponimi self-hosted: GeoNames mondiale + divisioni amministrative cinesi fino al livello stradale, `place_id` unificato, ricerca bilingue EN/ZH.
+>
+> **日本語** — セルフホスト型地名レジストリ:世界の GeoNames + 中国の街鎮レベル行政区画、統一 `place_id`、日中バイリンガル検索。
+>
+> **한국어** — 셀프 호스팅 지명 레지스트리: 전 세계 GeoNames + 중국 가진(街鎮) 단위 행정구역, 통합 `place_id`, 중영 이중 언어 검색.
+>
+> **Русский** — Самостоятельно размещаемый реестр топонимов: GeoNames по всему миру + административное деление Китая до уровня улиц, единый `place_id`, двуязычный поиск EN/ZH.
+>
+> **العربية** — سجل أسماء أماكن مستضاف ذاتيًا: GeoNames عالميًا + تقسيمات إدارية صينية حتى مستوى الشارع، معرّف `place_id` موحّد، بحث ثنائي اللغة EN/ZH.
+
