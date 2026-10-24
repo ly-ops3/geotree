@@ -111,7 +111,7 @@ database/               schema + geo 源数据缓存 + seed
 |------|------|------|
 | GeoNames gazetteer / alternateNames | [geonames.org](https://www.geonames.org) | [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)（需署名） |
 | CLDR 行政区中文名 | [unicode-org/cldr-json](https://github.com/unicode-org/cldr-json) | Unicode License |
-| ok_zh 国内区划（至街镇） | 第三方整理数据（MySQL dump） | 出处未明，公开分发前请确认可再分发性 |
+| ok_zh 国内区划（至街镇） | GitHub 开源四级区划数据集（原数据为行政区划公开统计信息） | 公开统计信息，建议注明上游仓库出处 |
 
 代码本体采用 [MIT](LICENSE)。
 
