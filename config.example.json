@@ -1,0 +1,22 @@
+{
+  "bind_mode": "local",
+  "api": {
+    "port": 5010,
+    "host": "0.0.0.0",
+    "threaded": true,
+    "debug": true
+  },
+  "database": {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "name": "geo_registry",
+    "user": "postgres",
+    "password": "",
+    "pool_size": 5
+  },
+  "data_dir": "",
+  "cors_origins": [
+    "http://localhost:5002",
+    "http://127.0.0.1:5002"
+  ]
+}
