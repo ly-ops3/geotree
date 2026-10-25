@@ -70,6 +70,7 @@ python scripts/geo/import_all.py --profile standard
 | `GET /api/places/{id}` | 单条元数据 |
 | `GET /api/places/{id}/path` | 面包屑（推荐） |
 | `POST /api/places/validate` | 写入前校验 `place_id` |
+| `GET /api/geo/resolve?text=` | 自由文本位置 → place_id（中英混排、多词实体、国内至街镇） |
 
 ## 服务器部署
 
