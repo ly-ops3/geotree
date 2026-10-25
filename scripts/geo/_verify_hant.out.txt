@@ -1,0 +1,34 @@
+== AT 样本 ==
+  Mailberg | 迈尔贝格 | 邁爾貝格
+  Zwischenwasser | 茨维申瓦瑟尔 | 茨維申瓦瑟爾
+  Zwettl-Niederoesterreich | 茨韦特尔 | 茨韋特爾
+  Wolfern | 沃尔费恩 | 沃爾費恩
+  Breitenfurt bei Wien | 维也纳附近布赖滕富特 | 維也納附近布賴滕富特
+  Gutau | 古陶 | 古陶
+  Schruns | 施伦斯 | 施倫斯
+  Silbertal | 锡贝塔尔 | 錫貝塔爾
+  Tschagguns | 查贡斯 | 查貢斯
+  Au | 奥 | 奧
+== 仍疑似繁体的 name_zh 数 ==
+  0
+== hant 有但 hans 空的行 ==
+  US L7 Kansas City -> 堪薩斯城
+  GB L7 Kingston upon Hull -> 赫爾河畔京士頓
+  US L7 Ash Grove -> 阿什格羅夫
+  US L7 Aloha -> 阿羅哈
+  US L7 Havertown -> 哈弗敦
+  US L7 Watkins -> 沃特金斯
+  US L7 Saginaw -> 薩吉諾
+  US L7 Arlington -> 阿靈頓縣
+  US L7 Tulsa -> 圖爾薩
+  ML L7 Bamako -> 巴馬科
+  AM L7 Yerevan -> 葉里溫
+== ok_zh 繁体样本 ==
+  天津城区 | 天津城區
+  七台河市 | 七臺河市
+  东营市 | 東營市
+  烟台市 | 煙臺市
+  潍坊市 | 濰坊市
+  济宁市 | 濟寧市
+  泰安市 | 泰安市
+  威海市 | 威海市

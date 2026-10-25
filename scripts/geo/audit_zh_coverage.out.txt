@@ -1,0 +1,159 @@
+=== 全局（geonames）按 level ===
+ lvl    name    total   has_zh   zh=en    local   lang
+   1 COUNTRY      249      249       2        0      0
+   2    ADM1     3804     3557       0        0      0
+   3    ADM2    47167    29718       0        0      0
+   4    ADM3   166254    48940       0   166254      0
+   5    ADM4   119918    39077       0   119918      0
+   6    ADM5    15018       30       0    15018      0
+   7     PPL   478781    39140       0   478781      0
+
+=== source/level 分布 ===
+  geonames   L1 249
+  geonames   L2 3804
+  geonames   L3 47167
+  geonames   L4 166254
+  geonames   L5 119918
+  geonames   L6 15018
+  geonames   L7 478781
+  macro      L15 26
+  ok_zh      L2 34
+  ok_zh      L3 369
+  ok_zh      L4 3238
+  ok_zh      L5 39103
+
+=== 缺中文最多的国家（level 2-4，前 40）===
+  US L4 缺 15142/29387
+  VN L4 缺 9783/10577
+  TH L4 缺 7333/7436
+  PY L4 缺 7326/8234
+  ID L4 缺 6907/7102
+  CZ L4 缺 6051/6314
+  IN L4 缺 5743/6891
+  EE L4 缺 4706/4706
+  TZ L4 缺 3553/3643
+  NG L4 缺 3096/3154
+  GB L4 缺 3013/3862
+  SK L4 缺 2835/2927
+  PT L4 缺 2726/3259
+  BI L4 缺 2552/2615
+  BG L4 缺 2447/2589
+  KR L4 缺 2278/3295
+  TN L4 缺 2058/2084
+  YE L4 缺 2025/2042
+  PL L4 缺 2022/2478
+  MX L3 缺 2021/2471
+  UA L4 缺 1724/1749
+  SE L4 缺 1687/1785
+  MA L4 缺 1631/1789
+  KH L4 缺 1611/1621
+  TR L4 缺 1544/1552
+  MG L4 缺 1459/1577
+  CA L4 缺 1408/1551
+  DZ L4 缺 1381/1541
+  CA L3 缺 1312/1641
+  PH L4 缺 1293/1646
+  EC L4 缺 920/1038
+  RU L3 缺 918/2648
+  PR L3 缺 895/902
+  KP L4 缺 772/966
+  NP L4 缺 707/754
+  JM L3 缺 699/825
+  NG L3 缺 659/785
+  TR L3 缺 653/974
+  LR L4 缺 600/618
+  CY L3 缺 599/615
+
+=== ADM1 缺中文统计（level=2，按国）===
+  PR 缺 26 个 ADM1
+  IM 缺 20 个 ADM1
+  MH 缺 15 个 ADM1
+  AI 缺 14 个 ADM1
+  VN 缺 11 个 ADM1
+  CK 缺 11 个 ADM1
+  BS 缺 10 个 ADM1
+  GU 缺 9 个 ADM1
+  YT 缺 8 个 ADM1
+  BW 缺 7 个 ADM1
+  DZ 缺 7 个 ADM1
+  KY 缺 6 个 ADM1
+  JE 缺 5 个 ADM1
+  AO 缺 4 个 ADM1
+  MK 缺 3 个 ADM1
+  MS 缺 3 个 ADM1
+  QA 缺 3 个 ADM1
+  KZ 缺 3 个 ADM1
+  SC 缺 3 个 ADM1
+  SH 缺 3 个 ADM1
+  CD 缺 3 个 ADM1
+  CF 缺 3 个 ADM1
+  UM 缺 3 个 ADM1
+  VI 缺 3 个 ADM1
+  AZ 缺 2 个 ADM1
+  ML 缺 2 个 ADM1
+  MP 缺 2 个 ADM1
+  BM 缺 2 个 ADM1
+  ET 缺 2 个 ADM1
+  CI 缺 2 个 ADM1
+  TO 缺 2 个 ADM1
+  NZ 缺 2 个 ADM1
+  NP 缺 2 个 ADM1
+  TT 缺 2 个 ADM1
+  IN 缺 2 个 ADM1
+  MG 缺 2 个 ADM1
+  TD 缺 1 个 ADM1
+  TJ 缺 1 个 ADM1
+  UA 缺 1 个 ADM1
+  YE 缺 1 个 ADM1
+  TF 缺 1 个 ADM1
+  AT 缺 1 个 ADM1
+  DJ 缺 1 个 ADM1
+  ES 缺 1 个 ADM1
+  FM 缺 1 个 ADM1
+  FO 缺 1 个 ADM1
+  GF 缺 1 个 ADM1
+  GG 缺 1 个 ADM1
+  GM 缺 1 个 ADM1
+  GN 缺 1 个 ADM1
+  GP 缺 1 个 ADM1
+  GQ 缺 1 个 ADM1
+  HU 缺 1 个 ADM1
+  IL 缺 1 个 ADM1
+  IQ 缺 1 个 ADM1
+  KG 缺 1 个 ADM1
+  KI 缺 1 个 ADM1
+  KP 缺 1 个 ADM1
+  LV 缺 1 个 ADM1
+  LY 缺 1 个 ADM1
+  MC 缺 1 个 ADM1
+  MD 缺 1 个 ADM1
+  MN 缺 1 个 ADM1
+  MQ 缺 1 个 ADM1
+  MU 缺 1 个 ADM1
+  MV 缺 1 个 ADM1
+  MZ 缺 1 个 ADM1
+  NE 缺 1 个 ADM1
+  PF 缺 1 个 ADM1
+  PH 缺 1 个 ADM1
+  PM 缺 1 个 ADM1
+  PY 缺 1 个 ADM1
+  RE 缺 1 个 ADM1
+  RO 缺 1 个 ADM1
+  SB 缺 1 个 ADM1
+  SJ 缺 1 个 ADM1
+
+=== 繁体字符样本（name_zh 命中常见繁体字，前 50）===
+  JP L7 en='Marugame' zh='丸亀'
+  JP L7 en='Kaseda-shirakame' zh='加世田白亀'
+  JP L7 en='Kameyama' zh='亀山'
+  JP L7 en='Kameshima' zh='亀岛'
+  JP L7 en='Kameoka' zh='亀冈'
+  JP L7 en='Kameda-honcho' zh='亀田本町'
+  KP L7 en='Kusong-si' zh='亀城'
+  KR L7 en='Gumi' zh='亀尾市'
+
+=== name_zh 非中文样本（zh 无汉字，前 30）===
+  CS L1 en='Serbia and Montenegro' zh='Serbia and Montenegro'
+  AN L1 en='Netherlands Antilles' zh='Netherlands Antilles'
+
+=== level=8 自然地理样本 ===

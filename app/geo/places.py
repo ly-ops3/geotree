@@ -88,12 +88,13 @@ def _serialize_place_row(db, row):
         'level': row['level'],
         'display_name': place_display_name(row),
         'name_zh': row.get('name_zh'),
+        'name_zh_hant': row.get('name_zh_hant'),
         'name_en': row.get('name_en'),
         'name_local': row.get('name_local'),
         'name_local_lang': row.get('name_local_lang'),
         'iso_country': row.get('iso_country'),
         'population': row.get('population'),
-        'feature': row.get('admin2_code') if (row.get('level') or 0) >= 8 else None,
+        'feature': row.get('feature_code') or (row.get('admin2_code') if (row.get('level') or 0) >= 8 else None),
         'has_children': _has_children(db, row['id']),
         'source': row.get('source'),
     }
@@ -287,9 +288,9 @@ def get_geo_stats(db):
     cn_gn_features = [
         dict(r)
         for r in db.execute(
-            '''SELECT admin2_code AS feature, COUNT(*) AS count FROM geo_places
+            '''SELECT COALESCE(feature_code, admin2_code) AS feature, COUNT(*) AS count FROM geo_places
                WHERE source = 'geonames' AND iso_country = 'CN' AND level = 8
-               GROUP BY admin2_code ORDER BY count DESC LIMIT 20'''
+               GROUP BY 1 ORDER BY count DESC LIMIT 20'''
         ).fetchall()
     ]
     samples = [
@@ -351,19 +352,28 @@ def normalize_area_token(text):
     return s
 
 
-def _match_ok_zh_children(db, parent_geo_id, token):
+def _match_ok_zh_children(db, parent_geo_id, token, fuzzy=True):
     token_norm = normalize_area_token(token)
-    rows = db.execute(
-        '''
-        SELECT p.* FROM geo_places p
-        WHERE p.source = 'ok_zh'
-          AND COALESCE(p.parent_id, -1) = COALESCE(?, -1)
-          AND p.is_selectable = TRUE
-        ''',
-        (parent_geo_id,),
-    ).fetchall()
+    if parent_geo_id is None:
+        # ok_zh 省级节点挂在大区（macro）下，顶层匹配按 level=2 取
+        rows = db.execute(
+            '''
+            SELECT p.* FROM geo_places p
+            WHERE p.source = 'ok_zh' AND p.level = 2 AND p.is_selectable = TRUE
+            ''',
+        ).fetchall()
+    else:
+        rows = db.execute(
+            '''
+            SELECT p.* FROM geo_places p
+            WHERE p.source = 'ok_zh'
+              AND p.parent_id = ?
+              AND p.is_selectable = TRUE
+            ''',
+            (parent_geo_id,),
+        ).fetchall()
     exact = []
-    fuzzy = []
+    fuzzy_hits = []
     for row in rows:
         row = dict(row)
         names = {
@@ -375,15 +385,31 @@ def _match_ok_zh_children(db, parent_geo_id, token):
         names.discard('')
         if token.strip() in names or token_norm in names:
             exact.append(row)
-        elif token_norm and any(token_norm in n or n in token_norm for n in names):
-            fuzzy.append(row)
+        elif fuzzy and token_norm and any(token_norm in n or n in token_norm for n in names):
+            fuzzy_hits.append(row)
     if len(exact) == 1:
         return exact[0]
     if len(exact) > 1:
         return exact[0]
-    if len(fuzzy) == 1:
-        return fuzzy[0]
+    if len(fuzzy_hits) == 1:
+        return fuzzy_hits[0]
     return None
+
+
+# 中国省级行政区英文名 → 标准中文名（ok_zh 无英文名，GeoNames CN gazetteer 未入库时的桥）
+CN_PROVINCE_EN = {
+    'beijing': '北京市', 'tianjin': '天津市', 'hebei': '河北省', 'shanxi': '山西省',
+    'inner mongolia': '内蒙古自治区', 'nei mongol': '内蒙古自治区', 'liaoning': '辽宁省',
+    'jilin': '吉林省', 'heilongjiang': '黑龙江省', 'shanghai': '上海市', 'jiangsu': '江苏省',
+    'zhejiang': '浙江省', 'anhui': '安徽省', 'fujian': '福建省', 'jiangxi': '江西省',
+    'shandong': '山东省', 'henan': '河南省', 'hubei': '湖北省', 'hunan': '湖南省',
+    'guangdong': '广东省', 'guangxi': '广西壮族自治区', 'hainan': '海南省',
+    'chongqing': '重庆市', 'sichuan': '四川省', 'guizhou': '贵州省', 'yunnan': '云南省',
+    'tibet': '西藏自治区', 'xizang': '西藏自治区', 'shaanxi': '陕西省', 'gansu': '甘肃省',
+    'qinghai': '青海省', 'ningxia': '宁夏回族自治区', 'xinjiang': '新疆维吾尔自治区',
+    'hong kong': '香港特别行政区', 'macau': '澳门特别行政区', 'macao': '澳门特别行政区',
+    'taiwan': '台湾省',
+}
 
 
 def _find_country(db, token):
@@ -440,6 +466,27 @@ def _match_geonames_child(db, parent_row, token):
     return None
 
 
+def _resolve_leading_node(db, parts):
+    """首段解析：多词实体（New Zealand / Inner Mongolia）按最长前缀分组试配。
+    返回 (row, consumed, scope)，未命中返回 (None, 0, None)。
+    多词段只允许精确匹配——避免 '内蒙古 通辽' 被模糊吸收进省级。"""
+    for size in range(len(parts), 0, -1):
+        seg = ' '.join(parts[:size])
+        prov = _match_ok_zh_children(db, None, seg, fuzzy=(size == 1))
+        if prov:
+            return prov, size, SCOPE_CN
+        country = _find_country(db, seg)
+        if country:
+            return country, size, SCOPE_ABROAD
+        # 英文省名桥：Inner Mongolia 通辽 → 内蒙古自治区 → ok_zh 下行
+        en_prov = CN_PROVINCE_EN.get(seg.lower())
+        if en_prov:
+            prov = _match_ok_zh_children(db, None, en_prov, fuzzy=False)
+            if prov:
+                return prov, size, SCOPE_CN
+    return None, 0, None
+
+
 def resolve_legacy_location_text(db, text):
     """将 users.location 自由文本解析为 geo_places 节点。返回 (place_id, scope, extra_text)。"""
     raw = (text or '').strip()
@@ -452,34 +499,18 @@ def resolve_legacy_location_text(db, text):
     if not parts:
         return None, None, None
 
-    # 国内：首段能匹配省级 ok_zh
-    prov = _match_ok_zh_children(db, None, parts[0])
-    if prov:
-        cur = prov
-        idx = 1
-        while idx < len(parts):
-            nxt = _match_ok_zh_children(db, cur['id'], parts[idx])
-            if not nxt:
-                break
-            cur = nxt
-            idx += 1
-        extra = ' '.join(parts[idx:]).strip() or None
-        return cur['id'], SCOPE_CN, extra
-
-    # 国外
-    country = _find_country(db, parts[0])
-    if not country:
+    cur, idx, scope = _resolve_leading_node(db, parts)
+    if not cur:
         return None, None, raw
-    cur = country
-    idx = 1
+    matcher = _match_ok_zh_children if scope == SCOPE_CN else _match_geonames_child
     while idx < len(parts):
-        nxt = _match_geonames_child(db, cur, parts[idx])
+        nxt = matcher(db, cur['id'] if scope == SCOPE_CN else cur, parts[idx])
         if not nxt:
             break
         cur = nxt
         idx += 1
     extra = ' '.join(parts[idx:]).strip() or None
-    return cur['id'], SCOPE_ABROAD, extra
+    return cur['id'], scope, extra
 
 
 def lookup_country_zh(iso2, fallback_en=None):
@@ -535,12 +566,43 @@ def _apply_localized_display(item):
         item['display_name'] = localized
 
 
+_ZH_HANT_REQUEST = frozenset({'zh-tw', 'zh-hk', 'zh-mo', 'zh-hant'})
+
+
+def _wants_hant(lang) -> bool:
+    return (lang or '').lower().replace('_', '-') in _ZH_HANT_REQUEST
+
+
+def _hant_fallback(items):
+    """zh-TW 等请求：geo_place_names 没命中时用 name_zh_hant 列兜底。"""
+    nodes = []
+    for item in items:
+        if not item:
+            continue
+        nodes.append(item)
+        nodes.extend(n for n in (item.get('path') or []) if n is not item)
+    for node in nodes:
+        if node.get('name_in_lang'):
+            continue
+        hant = (node.get('name_zh_hant') or '').strip()
+        if hant:
+            node['name_in_lang'] = hant
+            node['name_in_lang_code'] = 'zh-Hant'
+            _apply_localized_display(node)
+
+
 def localize_items(db, items, lang):
     """按请求语种填 name_in_lang，并只在传入 lang 时改 display_name。"""
-    if not lang or not items or not _table_exists(db, 'geo_place_names'):
+    if not lang or not items:
+        return items
+    if not _table_exists(db, 'geo_place_names'):
+        if _wants_hant(lang):
+            _hant_fallback(items)
         return items
     codes = language_fallbacks(lang)
     if not codes:
+        if _wants_hant(lang):
+            _hant_fallback(items)
         return items
     nodes = []
     for item in items:
@@ -573,6 +635,8 @@ def localize_items(db, items, lang):
         node['name_in_lang'] = hit[1]
         node['name_in_lang_code'] = hit[0]
         _apply_localized_display(node)
+    if _wants_hant(lang):
+        _hant_fallback(items)
     for item in items:
         path = item.get('path') if item else None
         if not path:

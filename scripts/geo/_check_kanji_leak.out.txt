@@ -1,0 +1,4 @@
+== name_zh==name_local 且含汉字，按国按级 ==
+
+== JP/KR/VN 中 zh==local 行: 0 ==
+不在 zh 别名表（疑似直充本地名）: 0

@@ -69,6 +69,7 @@ individual `GEO_DB_HOST` / `GEO_DB_PORT` / `GEO_DB_NAME` / `GEO_DB_USER` /
 | `GET /api/places/{id}` | single-place metadata |
 | `GET /api/places/{id}/path` | breadcrumb (recommended) |
 | `POST /api/places/validate` | validate `place_id` before writes |
+| `GET /api/geo/resolve?text=` | free-text location → `place_id` (EN/ZH mixed, multi-word entities, CN down to street level) |
 
 ## Data & Licensing
 

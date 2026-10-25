@@ -86,8 +86,8 @@ def _log(msg: str) -> None:
 def to_simplified_zh(text: str) -> str:
     text = (text or '').translate(_TRAD_TO_SIMP)
     try:
-        import zhconv  # type: ignore
-        return zhconv.convert(text, 'zh-cn')
+        from app.geo.names_zh import to_simplified
+        return to_simplified(text)
     except ImportError:
         return text
 

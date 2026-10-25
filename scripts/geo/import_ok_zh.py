@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from app.geo.names_zh import to_traditional
+
 
 def _ok_zh_parent_geo_id(db, ok_pid, ok_deep, ok_id_to_geo_id, ok_rows_by_id):
     if ok_deep == 0:
@@ -38,6 +40,7 @@ def import_ok_zh(db, selectable_max_deep=3):
         level = deep + 2
         parent_id = _ok_zh_parent_geo_id(db, row['pid'], deep, ok_id_to_geo_id, ok_rows_by_id)
         name_zh = row['ext_name'] or row['name']
+        name_zh_hant = to_traditional(name_zh) if name_zh else None
         sort_key = row.get('pinyin') or name_zh
         is_selectable = deep <= selectable_max_deep
 
@@ -47,14 +50,16 @@ def import_ok_zh(db, selectable_max_deep=3):
         ).fetchone()
         cur = db.execute(
             '''INSERT INTO geo_places
-               (parent_id, level, source, source_id, iso_country, name_zh, name_en, name_local,
+               (parent_id, level, source, source_id, iso_country, name_zh, name_zh_hant,
+                name_en, name_local,
                 name_local_lang, pinyin, deep_legacy, is_selectable, sort_key)
-               VALUES (?, ?, 'ok_zh', ?, 'CN', ?, ?, ?, 'zh', ?, ?, ?, ?)
+               VALUES (?, ?, 'ok_zh', ?, 'CN', ?, ?, ?, ?, 'zh', ?, ?, ?, ?)
                ON CONFLICT (source, source_id) DO UPDATE SET
                  parent_id=EXCLUDED.parent_id,
                  level=EXCLUDED.level,
                  iso_country=EXCLUDED.iso_country,
                  name_zh=EXCLUDED.name_zh,
+                 name_zh_hant=COALESCE(EXCLUDED.name_zh_hant, geo_places.name_zh_hant),
                  name_en=EXCLUDED.name_en,
                  name_local=EXCLUDED.name_local,
                  name_local_lang=EXCLUDED.name_local_lang,
@@ -68,6 +73,7 @@ def import_ok_zh(db, selectable_max_deep=3):
                 level,
                 str(ok_id),
                 name_zh,
+                name_zh_hant,
                 row.get('name'),
                 name_zh,
                 row.get('pinyin'),

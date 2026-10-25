@@ -10,7 +10,7 @@ from urllib.request import urlretrieve
 
 from app.geo.admin1_zh import admin1_zh
 from app.geo.country_zh import country_zh
-from app.geo.names_zh import ZhNameResolver, admin1_name_zh, _load_cldr_admin1
+from app.geo.names_zh import ZhNameResolver, admin1_name_zh, _load_cldr_admin1, to_traditional
 from app.config import get_geo_dir
 
 GEO_DIR = get_geo_dir()
@@ -95,8 +95,14 @@ def _prepare_fast_import(db):
 
 
 def _finish_fast_import(db):
-    """导入后：批量汉化 + 重建索引。"""
+    """导入后：批量汉化 + 通名规范 + 重建索引。"""
     _apply_zh_names_batch(db)
+    try:
+        from app.geo.admin_terms import apply_admin_terms
+        res = apply_admin_terms(db)
+        _log(f'  admin terms: +{res["applied"]}')
+    except Exception as exc:
+        _log(f'  WARN: admin terms failed: {exc}')
     _log('  fast import: recreate indexes ...')
     db.execute('CREATE INDEX IF NOT EXISTS idx_geo_places_parent ON geo_places(parent_id)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_geo_places_iso_country ON geo_places(iso_country)')
@@ -109,16 +115,21 @@ def _finish_fast_import(db):
 
 
 def _apply_zh_names_batch(db):
-    """从 zh_altnames.sqlite 批量回填 name_zh（避免导入期逐行 sqlite 查询）。"""
+    """从 zh_altnames.sqlite 批量回填 name_zh / name_zh_hant（避免导入期逐行 sqlite 查询）。"""
     import sqlite3
 
     db_path = os.path.join(GEO_DIR, 'zh_altnames.sqlite')
     if not os.path.isfile(db_path) or os.path.getsize(db_path) < 1024:
         _log('  skip batch zh names: zh_altnames.sqlite missing')
         return
-    _log('  batch apply zh names from sqlite ...')
-    db.execute('CREATE TEMP TABLE zh_alt_import (geonameid BIGINT PRIMARY KEY, name_zh TEXT NOT NULL)')
     conn = sqlite3.connect(db_path)
+    cols = {r[1] for r in conn.execute('PRAGMA table_info(zh_names)')}
+    has_hant = 'name_zh_hant' in cols
+    _log(f'  batch apply zh names from sqlite (hant={has_hant}) ...')
+    db.execute(
+        'CREATE TEMP TABLE zh_alt_import ('
+        'geonameid BIGINT PRIMARY KEY, name_zh TEXT, name_zh_hant TEXT)'
+    )
     batch = []
     total = 0
 
@@ -127,7 +138,8 @@ def _apply_zh_names_batch(db):
         if not batch:
             return
         db.executemany(
-            'INSERT INTO zh_alt_import (geonameid, name_zh) VALUES (?, ?) ON CONFLICT (geonameid) DO NOTHING',
+            'INSERT INTO zh_alt_import (geonameid, name_zh, name_zh_hant) VALUES (?, ?, ?) '
+            'ON CONFLICT (geonameid) DO NOTHING',
             batch,
         )
         total += len(batch)
@@ -136,7 +148,12 @@ def _apply_zh_names_batch(db):
             db.commit()
             _log(f'    ... zh_alt_import {total}')
 
-    for row in conn.execute('SELECT geonameid, name_zh FROM zh_names'):
+    select_sql = (
+        'SELECT geonameid, name_zh, name_zh_hant FROM zh_names'
+        if has_hant else
+        'SELECT geonameid, name_zh, NULL FROM zh_names'
+    )
+    for row in conn.execute(select_sql):
         batch.append(row)
         if len(batch) >= 50000:
             flush_batch()
@@ -144,10 +161,22 @@ def _apply_zh_names_batch(db):
     conn.close()
     db.commit()
     db.execute(
-        '''UPDATE geo_places g SET name_zh = z.name_zh
+        '''UPDATE geo_places g
+           SET name_zh = z.name_zh,
+               name_zh_hant = COALESCE(z.name_zh_hant, g.name_zh_hant)
            FROM zh_alt_import z
            WHERE g.source = 'geonames' AND g.source_id = z.geonameid::text
-             AND (g.name_zh IS NULL OR g.name_zh = '' OR g.name_zh = g.name_en)'''
+             AND z.name_zh IS NOT NULL AND z.name_zh <> ''
+             AND (g.name_zh IS NULL OR g.name_zh = '' OR g.name_zh = g.name_en
+                  OR (z.name_zh_hant IS NOT NULL AND g.name_zh = z.name_zh_hant))'''
+    )
+    db.execute(
+        '''UPDATE geo_places g
+           SET name_zh_hant = z.name_zh_hant
+           FROM zh_alt_import z
+           WHERE g.source = 'geonames' AND g.source_id = z.geonameid::text
+             AND z.name_zh_hant IS NOT NULL AND z.name_zh_hant <> ''
+             AND g.name_zh_hant IS NULL'''
     )
     updated = db.execute(
         '''SELECT COUNT(*) AS c FROM geo_places g
@@ -193,6 +222,46 @@ def _resolve_name_zh(
     return None
 
 
+def _resolve_name_zh_pair(
+    *,
+    geonameid=None,
+    alternatenames='',
+    admin1_code=None,
+    name_en=None,
+    name_local=None,
+    allow_admin1_fallback=False,
+):
+    """返回 (简体名, 繁体名)。繁体优先别名表真实 hant，缺省 OpenCC s2t 补。"""
+    from app.geo.names_zh import to_simplified, to_traditional
+
+    hant = None
+    hans = None
+    if _zh_resolver and not _fast_import:
+        hans, hant = _zh_resolver.resolve_pair(
+            geonameid=geonameid,
+            alternatenames=alternatenames,
+            admin1_code=admin1_code,
+            name_en=name_en,
+            name_local=name_local,
+            allow_admin1_fallback=allow_admin1_fallback,
+        )
+    if not hans and allow_admin1_fallback and admin1_code:
+        hans = admin1_name_zh(admin1_code)
+    if not hans:
+        picked = _pick_name_zh(alternatenames, name_en)
+        if picked:
+            hans = to_simplified(picked)
+    if not hans:
+        for candidate in (name_local, name_en):
+            if candidate and any('\u4e00' <= ch <= '\u9fff' for ch in candidate):
+                hans = to_simplified(candidate)
+                break
+    if hans and not hant:
+        hant = to_traditional(hans)
+    return hans, hant
+
+
+
 def _ensure_geo_dir():
     os.makedirs(GEO_DIR, exist_ok=True)
 
@@ -232,20 +301,24 @@ def _name_sort_key(name_zh, name_en):
 
 def _upsert_place(db, *, parent_id, level, source_id, iso_country, admin1_code, admin2_code,
                   name_en, name_zh, name_local, population, is_selectable, sort_key, source='geonames',
-                  name_local_lang=None):
+                  name_local_lang=None, name_zh_hant=None, feature_class=None, feature_code=None):
     cur = db.execute(
         '''INSERT INTO geo_places
            (parent_id, level, source, source_id, iso_country, admin1_code, admin2_code,
-            name_en, name_zh, name_local, name_local_lang, population, is_selectable, sort_key)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            feature_class, feature_code,
+            name_en, name_zh, name_zh_hant, name_local, name_local_lang, population, is_selectable, sort_key)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (source, source_id) DO UPDATE SET
              parent_id=EXCLUDED.parent_id,
              level=EXCLUDED.level,
              iso_country=EXCLUDED.iso_country,
              admin1_code=EXCLUDED.admin1_code,
              admin2_code=EXCLUDED.admin2_code,
+             feature_class=EXCLUDED.feature_class,
+             feature_code=EXCLUDED.feature_code,
              name_en=EXCLUDED.name_en,
              name_zh=EXCLUDED.name_zh,
+             name_zh_hant=COALESCE(EXCLUDED.name_zh_hant, geo_places.name_zh_hant),
              name_local=COALESCE(EXCLUDED.name_local, geo_places.name_local),
              name_local_lang=COALESCE(EXCLUDED.name_local_lang, geo_places.name_local_lang),
              population=EXCLUDED.population,
@@ -260,8 +333,11 @@ def _upsert_place(db, *, parent_id, level, source_id, iso_country, admin1_code, 
             iso_country,
             admin1_code,
             admin2_code,
+            feature_class,
+            feature_code,
             name_en,
             name_zh,
+            name_zh_hant,
             name_local,
             name_local_lang,
             population,
@@ -469,6 +545,7 @@ def _import_geonames_body(db, *, download=True):
         iso2 = c['iso2'].upper()
         name_en = c['name_en']
         name_zh = country_zh(iso2, name_en)
+        name_zh_hant = to_traditional(name_zh) if name_zh else None
         source_id = c['geonameid'] or f'country:{iso2}'
         geo_id = _upsert_place(
             db,
@@ -478,8 +555,11 @@ def _import_geonames_body(db, *, download=True):
             iso_country=iso2,
             admin1_code=None,
             admin2_code=None,
+            feature_class='A',
+            feature_code='PCLI',
             name_en=name_en,
             name_zh=name_zh,
+            name_zh_hant=name_zh_hant,
             name_local=None,
             population=None,
             is_selectable=True,
@@ -498,7 +578,7 @@ def _import_geonames_body(db, *, download=True):
             continue
         code = row['code']
         name_en = row['name_en']
-        name_zh = _resolve_name_zh(
+        name_zh, name_zh_hant = _resolve_name_zh_pair(
             geonameid=row.get('geonameid'),
             admin1_code=code,
             name_en=name_en,
@@ -513,8 +593,11 @@ def _import_geonames_body(db, *, download=True):
             iso_country=row['iso2'],
             admin1_code=code,
             admin2_code=None,
+            feature_class='A',
+            feature_code='ADM1',
             name_en=name_en,
             name_zh=name_zh,
+            name_zh_hant=name_zh_hant,
             name_local=None,
             population=None,
             is_selectable=True,
@@ -534,7 +617,7 @@ def _import_geonames_body(db, *, download=True):
             continue
         code = row['code']
         name_en = row['name_en']
-        name_zh = _resolve_name_zh(
+        name_zh, name_zh_hant = _resolve_name_zh_pair(
             geonameid=row.get('geonameid'),
             admin1_code=row['admin1_key'],
             name_en=name_en,
@@ -548,8 +631,11 @@ def _import_geonames_body(db, *, download=True):
             iso_country=row['iso2'],
             admin1_code=row['admin1_key'],
             admin2_code=code,
+            feature_class='A',
+            feature_code='ADM2',
             name_en=name_en,
             name_zh=name_zh,
+            name_zh_hant=name_zh_hant,
             name_local=None,
             population=None,
             is_selectable=True,
@@ -587,7 +673,7 @@ def _import_geonames_body(db, *, download=True):
             population = 0
         keys = _admin_keys(iso2, a1, a2, a3, a4)
         name_en = ascii_name or name
-        name_zh = _resolve_name_zh(
+        name_zh, name_zh_hant = _resolve_name_zh_pair(
             geonameid=geonameid,
             alternatenames=alternatenames,
             admin1_code=keys.get('adm1'),
@@ -612,8 +698,11 @@ def _import_geonames_body(db, *, download=True):
                 iso_country=iso2,
                 admin1_code=keys.get('adm1'),
                 admin2_code=keys.get('adm2') or keys.get('adm3') or keys.get('adm4'),
+                feature_class='A',
+                feature_code=feature_code,
                 name_en=name_en,
                 name_zh=name_zh,
+                name_zh_hant=name_zh_hant,
                 name_local=name,
                 population=None,
                 is_selectable=True,
@@ -645,8 +734,11 @@ def _import_geonames_body(db, *, download=True):
             iso_country=iso2,
             admin1_code=keys.get('adm1'),
             admin2_code=keys.get('adm2'),
+            feature_class='P',
+            feature_code=feature_code,
             name_en=name_en,
             name_zh=name_zh,
+            name_zh_hant=name_zh_hant,
             name_local=name,
             population=population,
             is_selectable=True,
@@ -665,8 +757,8 @@ def _import_geonames_body(db, *, download=True):
     ).fetchone()
     if cx:
         db.execute(
-            "UPDATE geo_places SET name_zh = ? WHERE id = ?",
-            ('圣诞岛', cx['id']),
+            "UPDATE geo_places SET name_zh = ?, name_zh_hant = ? WHERE id = ?",
+            ('圣诞岛', to_traditional('圣诞岛'), cx['id']),
         )
         db.commit()
 
@@ -713,7 +805,7 @@ def _import_geonames_row(
 ):
     """处理 allCountries 单行；返回是否写入。"""
     name_en = ascii_name or name
-    name_zh = _resolve_name_zh(
+    name_zh, name_zh_hant = _resolve_name_zh_pair(
         geonameid=geonameid,
         alternatenames=alternatenames,
         admin1_code=keys.get('adm1'),
@@ -738,8 +830,11 @@ def _import_geonames_row(
             iso_country=iso2,
             admin1_code=keys.get('adm1'),
             admin2_code=keys.get('adm2') or keys.get('adm3') or keys.get('adm4'),
+            feature_class='A',
+            feature_code=feature_code,
             name_en=name_en,
             name_zh=name_zh,
+            name_zh_hant=name_zh_hant,
             name_local=name,
             population=None,
             is_selectable=True,
@@ -768,8 +863,11 @@ def _import_geonames_row(
             iso_country=iso2,
             admin1_code=keys.get('adm1'),
             admin2_code=keys.get('adm2'),
+            feature_class='P',
+            feature_code=feature_code,
             name_en=name_en,
             name_zh=name_zh,
+            name_zh_hant=name_zh_hant,
             name_local=name,
             population=population,
             is_selectable=True,
@@ -789,8 +887,6 @@ def _import_geonames_row(
     if not parent_id:
         return False
     label = name_zh or name_en
-    feat_tag = f'{feature_class}.{feature_code}'
-    display_en = name_en if include_natural and not full_gazetteer else f'{name_en} ({feat_tag})'
     _upsert_place(
         db,
         parent_id=parent_id,
@@ -798,12 +894,15 @@ def _import_geonames_row(
         source_id=geonameid,
         iso_country=iso2,
         admin1_code=keys.get('adm1'),
-        admin2_code=feat_tag,
-        name_en=display_en,
+        admin2_code=None,
+        feature_class=feature_class,
+        feature_code=feature_code,
+        name_en=name_en,
         name_zh=name_zh,
+        name_zh_hant=name_zh_hant,
         name_local=name,
         population=population or None,
-        is_selectable=True,
+        is_selectable=False,
         sort_key=_name_sort_key(label, name_en),
     )
     pending_ref[0] += 1
@@ -887,8 +986,11 @@ def _import_china_geonames_body(db, *, download=False, include_natural=False, fu
                 iso_country='CN',
                 admin1_code=None,
                 admin2_code=None,
+                feature_class='A',
+                feature_code='PCLI',
                 name_en=c['name_en'],
                 name_zh=country_zh('CN', c['name_en']),
+                name_zh_hant=to_traditional(country_zh('CN', c['name_en'])),
                 name_local=None,
                 population=None,
                 is_selectable=True,
@@ -905,7 +1007,7 @@ def _import_china_geonames_body(db, *, download=False, include_natural=False, fu
             continue
         code = row['code']
         name_en = row['name_en']
-        name_zh = _resolve_name_zh(
+        name_zh, name_zh_hant = _resolve_name_zh_pair(
             geonameid=row.get('geonameid'),
             admin1_code=code,
             name_en=name_en,
@@ -919,8 +1021,11 @@ def _import_china_geonames_body(db, *, download=False, include_natural=False, fu
             iso_country='CN',
             admin1_code=code,
             admin2_code=None,
+            feature_class='A',
+            feature_code='ADM1',
             name_en=name_en,
             name_zh=name_zh,
+            name_zh_hant=name_zh_hant,
             name_local=None,
             population=None,
             is_selectable=True,
@@ -937,7 +1042,7 @@ def _import_china_geonames_body(db, *, download=False, include_natural=False, fu
             continue
         code = row['code']
         name_en = row['name_en']
-        name_zh = _resolve_name_zh(
+        name_zh, name_zh_hant = _resolve_name_zh_pair(
             geonameid=row.get('geonameid'),
             admin1_code=row['admin1_key'],
             name_en=name_en,
@@ -950,8 +1055,11 @@ def _import_china_geonames_body(db, *, download=False, include_natural=False, fu
             iso_country='CN',
             admin1_code=row['admin1_key'],
             admin2_code=code,
+            feature_class='A',
+            feature_code='ADM2',
             name_en=name_en,
             name_zh=name_zh,
+            name_zh_hant=name_zh_hant,
             name_local=None,
             population=None,
             is_selectable=True,

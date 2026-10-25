@@ -17,6 +17,7 @@ from app.geo.places import (
     list_place_names,
     localize_items,
     place_scope,
+    resolve_legacy_location_text,
     search_places,
     validate_place_for_profile,
 )
@@ -131,6 +132,33 @@ def region_path(place_id):
     if lang:
         localize_items(db, path, lang)
     return api_success({'path': path}, legacy={'path': path})
+
+
+@geo_bp.route('/resolve', methods=['GET'])
+def geo_resolve():
+    """自由文本位置 → place_id。供外部应用（通讯录/导出数据）把脏地址结构化。"""
+    db = get_db()
+    if not geo_tables_ready(db):
+        return _geo_not_ready()
+    text = (request.args.get('text') or request.args.get('q') or '').strip()
+    if not text:
+        return api_error('缺少 text 参数', code='ERR_INVALID_PARAM')
+    if len(text) > 200:
+        return api_error('text 过长', code='ERR_INVALID_PARAM')
+    place_id, scope, extra = resolve_legacy_location_text(db, text)
+    payload = {
+        'ok': True,
+        'matched': place_id is not None or scope in (SCOPE_CN, SCOPE_ABROAD),
+        'place_id': place_id,
+        'scope': scope,
+        'extra_text': extra,
+    }
+    if place_id:
+        item = get_place(db, place_id)
+        payload['place'] = item
+        payload['display_name'] = item.get('display_name') if item else None
+        payload['path'] = get_breadcrumb(db, place_id)
+    return api_success(payload, legacy=payload)
 
 
 @geo_bp.route('/regions/search', methods=['GET'])

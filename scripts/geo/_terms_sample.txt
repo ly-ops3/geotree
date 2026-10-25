@@ -1,0 +1,25 @@
+PE L4 Quilca -> 基尔卡区
+IT L4 Riese Pio X -> 列塞庇护十世村
+VN L4 Thi Tran Lac Duong -> 乐阳市镇
+KH L3 Stueng Saen -> 斯登森县
+FR L3 Charente -> 夏朗德省
+FR L4 Le Blanc -> 勒布朗区
+JP L3 Nichinan Shi -> 日南市
+PE L4 Carmen Salcedo -> 卡门萨尔塞多区
+UA L4 Kyivskyi District -> 基辅区
+MM L2 Kachin State -> 克钦邦
+EE L3 Saarde vald -> 萨尔德乡
+PE L2 Amazonas -> 亚马孙大区
+JP L3 Uki Shi -> 宇城市
+MA L3 Oued-Ed-Dahab -> 黄金谷地省
+TH L3 Amphoe Bueng Bun -> 本汶县
+TR L2 Giresun -> 吉雷松省
+RO L3 Comuna Doicesti -> 多伊切什蒂乡
+DZ L2 Khenchela -> 汉舍莱省
+US L3 Gilpin County -> 吉尔平县
+GE L3 Baghdati Municipality -> 巴格达蒂市镇
+US L3 Cedar County -> 锡达县
+CZ L2 South Moravian -> 南摩拉维亚州
+TR L2 Bilecik -> 比莱吉克省
+KZ L3 Karatal'skiy Rayon -> 卡拉塔尔区
+US L3 Johnston County -> 约翰斯顿县

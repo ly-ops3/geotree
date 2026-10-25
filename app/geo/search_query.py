@@ -152,8 +152,21 @@ def bounded_int(value, label, low, high):
     raise SearchError(f'{label} 须为 {low} 至 {high} 的整数')
 
 
+def _to_simplified_query(query):
+    """繁体输入归一为简体，命中 name_zh（简体列）。"""
+    try:
+        from app.geo.names_zh import to_simplified
+    except Exception:
+        return query
+    query['words'] = [to_simplified(w) for w in query['words']]
+    if query['exact']:
+        query['exact'] = to_simplified(query['exact'])
+    return query
+
+
 def search(db, args, display_name):
     query = parse_query(args.get('q', ''))
+    query = _to_simplified_query(query)
     for key in ('country', 'deep'):
         if args.get(key) not in (None, ''):
             val = normalize(args[key]) if key == 'country' else bounded_int(args[key], key, -1, 5)

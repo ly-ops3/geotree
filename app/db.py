@@ -57,6 +57,12 @@ def _ensure_local_name_schema(db):
     )
     if _table_exists(db, 'geo_places') and not _column_exists(db, 'geo_places', 'name_local_lang'):
         db.execute('ALTER TABLE geo_places ADD COLUMN name_local_lang TEXT')
+    if _table_exists(db, 'geo_places') and not _column_exists(db, 'geo_places', 'name_zh_hant'):
+        db.execute('ALTER TABLE geo_places ADD COLUMN name_zh_hant TEXT')
+    if _table_exists(db, 'geo_places') and not _column_exists(db, 'geo_places', 'feature_class'):
+        db.execute('ALTER TABLE geo_places ADD COLUMN feature_class CHAR(1)')
+    if _table_exists(db, 'geo_places') and not _column_exists(db, 'geo_places', 'feature_code'):
+        db.execute('ALTER TABLE geo_places ADD COLUMN feature_code TEXT')
     db.execute(
         '''CREATE TABLE IF NOT EXISTS geo_place_names (
             place_id BIGINT NOT NULL REFERENCES geo_places(id) ON DELETE CASCADE,
