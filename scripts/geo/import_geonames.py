@@ -301,13 +301,17 @@ def _name_sort_key(name_zh, name_en):
 
 def _upsert_place(db, *, parent_id, level, source_id, iso_country, admin1_code, admin2_code,
                   name_en, name_zh, name_local, population, is_selectable, sort_key, source='geonames',
-                  name_local_lang=None, name_zh_hant=None, feature_class=None, feature_code=None):
+                  name_local_lang=None, name_zh_hant=None, feature_class=None, feature_code=None,
+                  name_base=None):
+    if name_base is None:
+        from app.geo.admin_terms import strip_known_term
+        name_base = strip_known_term(name_zh, iso_country)
     cur = db.execute(
         '''INSERT INTO geo_places
            (parent_id, level, source, source_id, iso_country, admin1_code, admin2_code,
             feature_class, feature_code,
-            name_en, name_zh, name_zh_hant, name_local, name_local_lang, population, is_selectable, sort_key)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            name_en, name_zh, name_zh_hant, name_base, name_local, name_local_lang, population, is_selectable, sort_key)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (source, source_id) DO UPDATE SET
              parent_id=EXCLUDED.parent_id,
              level=EXCLUDED.level,
@@ -319,6 +323,7 @@ def _upsert_place(db, *, parent_id, level, source_id, iso_country, admin1_code, 
              name_en=EXCLUDED.name_en,
              name_zh=EXCLUDED.name_zh,
              name_zh_hant=COALESCE(EXCLUDED.name_zh_hant, geo_places.name_zh_hant),
+             name_base=COALESCE(EXCLUDED.name_base, geo_places.name_base),
              name_local=COALESCE(EXCLUDED.name_local, geo_places.name_local),
              name_local_lang=COALESCE(EXCLUDED.name_local_lang, geo_places.name_local_lang),
              population=EXCLUDED.population,
@@ -338,6 +343,7 @@ def _upsert_place(db, *, parent_id, level, source_id, iso_country, admin1_code, 
             name_en,
             name_zh,
             name_zh_hant,
+            name_base,
             name_local,
             name_local_lang,
             population,

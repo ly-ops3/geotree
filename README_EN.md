@@ -1,10 +1,14 @@
-# Geo Registry
+# geotree
 
-**Self-hosted place-name registry service** (Flask + PostgreSQL): a single
-`geo_places` tree combining the GeoNames global gazetteer, a China administrative
-division dataset down to township/street level, and macro-region mappings —
+**A self-hosted multilingual place-name tree** (Flask + PostgreSQL): the
+GeoNames global gazetteer + a China administrative division dataset down to
+township/street level + macro-region mappings, with **separate simplified and
+traditional Chinese names** (`name_zh` / `name_zh_hant` / `name_base`) —
 exposed through one unified `place_id`, hierarchical browsing, bilingual
 (EN/ZH) search, and free-text location resolution.
+
+Keywords: geonames chinese names / place tree / administrative divisions /
+geolocation registry
 
 The goal: multiple applications share one geographic dataset and one
 `place_id` semantic. Business databases store only `location_place_id`;

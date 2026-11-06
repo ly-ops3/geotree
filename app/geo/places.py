@@ -89,6 +89,7 @@ def _serialize_place_row(db, row):
         'display_name': place_display_name(row),
         'name_zh': row.get('name_zh'),
         'name_zh_hant': row.get('name_zh_hant'),
+        'name_base': row.get('name_base'),
         'name_en': row.get('name_en'),
         'name_local': row.get('name_local'),
         'name_local_lang': row.get('name_local_lang'),

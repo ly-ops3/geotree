@@ -1,10 +1,14 @@
-# Geo Registry
+# geotree
 
 [English](README_EN.md)
 
-独立的全球地理名称库服务（Flask + PostgreSQL）：一棵 `geo_places` 树承载
-GeoNames 全球区划 + ok_zh 国内区划（到街镇）+ 大区映射，
+一棵自托管的多语言地名树（Flask + PostgreSQL）：GeoNames 全球区划
++ ok_zh 国内区划（到街镇）+ 大区映射，**简繁双写中文名库**
+（`name_zh` / `name_zh_hant` / `name_base` 专名三列），
 对外提供统一的 `place_id`、级联浏览、中英文搜索与自由文本解析 API。
+
+关键词：GeoNames 中文名库 / 行政区划数据 / 地名树 / place tree /
+administrative divisions / Chinese place names / geolocation registry
 
 设计目标：多个应用共用同一份地理数据与 `place_id` 语义——业务库只存
 `location_place_id`，地名展示/编辑全部走本服务。
@@ -86,7 +90,7 @@ docker compose up --build
 全部种子随仓库分发，clone 即有（数据库连接走环境变量，不落盘密码）：
 
 ```bash
-git clone <repo> && cd geo-registry
+git clone <repo> && cd geotree
 pip install -r requirements.txt
 createdb -U postgres geo_registry
 export GEO_DB_DSN='postgresql://postgres@127.0.0.1:5432/geo_registry'

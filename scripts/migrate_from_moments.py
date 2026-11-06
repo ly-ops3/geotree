@@ -4,7 +4,7 @@
 表：geo_places → ok_zh_level4
 
 用法:
-    cd geo-registry
+    cd geotree
     python scripts/migrate_from_moments.py --dry-run
     python scripts/migrate_from_moments.py
     python scripts/migrate_from_moments.py --force   # 清空目标库后重导

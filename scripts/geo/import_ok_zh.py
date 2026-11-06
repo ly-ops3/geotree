@@ -51,7 +51,7 @@ def import_ok_zh(db, selectable_max_deep=3):
         cur = db.execute(
             '''INSERT INTO geo_places
                (parent_id, level, source, source_id, iso_country, name_zh, name_zh_hant,
-                name_en, name_local,
+                name_base, name_local,
                 name_local_lang, pinyin, deep_legacy, is_selectable, sort_key)
                VALUES (?, ?, 'ok_zh', ?, 'CN', ?, ?, ?, ?, 'zh', ?, ?, ?, ?)
                ON CONFLICT (source, source_id) DO UPDATE SET
@@ -60,7 +60,7 @@ def import_ok_zh(db, selectable_max_deep=3):
                  iso_country=EXCLUDED.iso_country,
                  name_zh=EXCLUDED.name_zh,
                  name_zh_hant=COALESCE(EXCLUDED.name_zh_hant, geo_places.name_zh_hant),
-                 name_en=EXCLUDED.name_en,
+                 name_base=EXCLUDED.name_base,
                  name_local=EXCLUDED.name_local,
                  name_local_lang=EXCLUDED.name_local_lang,
                  pinyin=EXCLUDED.pinyin,

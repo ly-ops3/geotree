@@ -44,6 +44,6 @@ def create_app():
 
         db = get_db()
         ready = geo_tables_ready(db)
-        return {'ok': True, 'service': 'geo-registry', 'geo_ready': ready}
+        return {'ok': True, 'service': 'geotree', 'geo_ready': ready}
 
     return app

@@ -118,9 +118,12 @@ def name_expression(alias, column):
     return f"COALESCE(lower(regexp_replace(btrim(normalize({alias}.{column}, NFKC)), '\\s+', ' ', 'g')), '')"
 
 
+NAME_COLS = ('name_zh', 'name_en', 'name_local', 'name_base')
+
+
 def names(alias, op):
     return '(' + ' OR '.join(name_expression(alias, col) + ' ' + op
-                             for col in ('name_zh', 'name_en', 'name_local')) + ')'
+                             for col in NAME_COLS) + ')'
 
 
 def pattern(value):
@@ -133,7 +136,7 @@ def country_code(db, value):
         rows = db.execute("SELECT DISTINCT iso_country FROM geo_places WHERE iso_country=? LIMIT 2", (code,)).fetchall()
     else:
         rows = db.execute("SELECT DISTINCT iso_country FROM geo_places p WHERE source='geonames' AND level=1 AND " +
-                          names('p', '= ?'), (value,) * 3).fetchall()
+                          names('p', '= ?'), (value,) * len(NAME_COLS)).fetchall()
     codes = {r['iso_country'].strip() for r in rows if r['iso_country']}
     if len(codes) != 1:
         raise SearchError('国家名称无法识别或存在歧义；含空格的名称请用双引号，例如 country="United States"')
@@ -242,23 +245,23 @@ def search(db, args, display_name):
     joined = ' '.join(words)
     if exact:
         clauses.append(names('p', '= ?'))
-        params.extend([exact] * 3)
+        params.extend([exact] * len(NAME_COLS))
         for word in words:
-            clause, values = ancestors("a.id<>p.id AND " + names('a', "LIKE ? ESCAPE '!'"), ['%' + pattern(word) + '%'] * 3)
+            clause, values = ancestors("a.id<>p.id AND " + names('a', "LIKE ? ESCAPE '!'"), ['%' + pattern(word) + '%'] * len(NAME_COLS))
             clauses.append(clause)
             params.extend(values)
     elif words:
         full_clause = names('p', "LIKE ? ESCAPE '!'")
-        full_params = ['%' + pattern(joined) + '%'] * 3
+        full_params = ['%' + pattern(joined) + '%'] * len(NAME_COLS)
         compact = ''.join(words)
         pin_clause = "replace(lower(COALESCE(p.pinyin,'')), ' ', '') LIKE ? ESCAPE '!'"
         alternatives = [full_clause, pin_clause]
         match_params = full_params + ['%' + pattern(compact) + '%']
         if len(words) > 1:
             target = names('p', "LIKE ? ESCAPE '!'")
-            values = ['%' + pattern(words[-1]) + '%'] * 3
+            values = ['%' + pattern(words[-1]) + '%'] * len(NAME_COLS)
             for word in words[:-1]:
-                clause, extra = ancestors("a.id<>p.id AND " + names('a', "LIKE ? ESCAPE '!'"), ['%' + pattern(word) + '%'] * 3)
+                clause, extra = ancestors("a.id<>p.id AND " + names('a', "LIKE ? ESCAPE '!'"), ['%' + pattern(word) + '%'] * len(NAME_COLS))
                 target += ' AND ' + clause
                 values.extend(extra)
             alternatives.append('(' + target + ')')
@@ -290,8 +293,8 @@ def search(db, args, display_name):
             names('p', "LIKE ? ESCAPE '!'") + ' THEN 1 WHEN ' +
             names('p', "LIKE ? ESCAPE '!'") + ' THEN 2 WHEN ' +
             "replace(lower(COALESCE(p.pinyin,'')), ' ', '') LIKE ? ESCAPE '!' THEN 4 ELSE 3 END")
-    rank_params = ([target] * 3 + [pattern(target) + '%'] * 3 +
-                   ['%' + pattern(target) + '%'] * 3 + ['%' + pattern(''.join(words)) + '%'])
+    rank_params = ([target] * len(NAME_COLS) + [pattern(target) + '%'] * len(NAME_COLS) +
+                   ['%' + pattern(target) + '%'] * len(NAME_COLS) + ['%' + pattern(''.join(words)) + '%'])
     rows = db.execute('SELECT p.*, (' + DEPTH_SQL + ') AS admin_depth, ' + rank +
                       ' AS search_rank FROM geo_places p WHERE ' + ' AND '.join(clauses) +
                       ' ORDER BY search_rank, p.population DESC NULLS LAST, p.id LIMIT ? OFFSET ?',

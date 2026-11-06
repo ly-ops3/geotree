@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS geo_places (
     name_en TEXT,
     name_zh TEXT,
     name_zh_hant TEXT,
+    name_base TEXT,
     name_local TEXT,
     name_local_lang TEXT REFERENCES geo_languages(code),
     pinyin TEXT,
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS geo_places (
 CREATE INDEX IF NOT EXISTS idx_geo_places_parent ON geo_places(parent_id);
 CREATE INDEX IF NOT EXISTS idx_geo_places_iso_country ON geo_places(iso_country);
 CREATE INDEX IF NOT EXISTS idx_geo_places_name_zh ON geo_places(name_zh);
+CREATE INDEX IF NOT EXISTS idx_geo_places_name_base ON geo_places(name_base);
 CREATE INDEX IF NOT EXISTS idx_geo_places_admin1 ON geo_places(iso_country, admin1_code);
 
 -- 每个地点、每种语言一条首选名称。name_local 是其中主语言那条的冗余，方便列表不 JOIN。

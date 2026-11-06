@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """GeoNames 全球汉化修复（按国家参数）。
 
-geo_places 在 geo-registry 库，请在本目录运行：
-  cd geo-registry
+geo_places 在 geotree 库，请在本目录运行：
+  cd geotree
   python -u scripts/geo/fix_geonames_name_zh.py --country ALL --wikipedia
   python -u scripts/geo/fix_geonames_name_zh.py --country US,CA,AU
 """

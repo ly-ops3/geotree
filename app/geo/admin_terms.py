@@ -659,6 +659,32 @@ def has_known_term(name_zh: str | None) -> bool:
     return any(zh.endswith(t) for t in KNOWN_TERMS)
 
 
+# 单字通名中容易和音译撞车的，限制只在"该字真是通名"的国家剥
+_TERM_COUNTRY = {
+    '道': {'CN', 'TW', 'JP', 'KR', 'KP'},
+    '府': {'CN', 'TW', 'JP', 'TH'},
+    '都': {'JP'},
+    '町': {'JP'},
+    '宗': {'BT'},
+    '岛': {'KM', 'VI', 'UM', 'CK', 'KI', 'TK'},
+}
+
+
+def strip_known_term(name_zh: str | None, iso_country: str | None = None) -> str | None:
+    """剥掉尾部已知通名得到专名（最长匹配）；没有通名返回 None。
+    iso_country 用于限定易撞音译的单字通名（如 Kisvarda→小瓦尔道 的'道'是音译）。"""
+    zh = (name_zh or '').strip()
+    iso = (iso_country or '').upper()
+    for t in sorted(KNOWN_TERMS, key=len, reverse=True):
+        if not zh.endswith(t) or len(zh) <= len(t):
+            continue
+        allowed = _TERM_COUNTRY.get(t)
+        if allowed is not None and iso not in allowed:
+            continue
+        return zh[:-len(t)]
+    return None
+
+
 def apply_admin_terms(db, *, dry_run: bool = False) -> dict:
     """给缺通名的行政区 name_zh 追加通名；name_zh_hant 同步（s2t）。"""
     from app.geo.names_zh import to_traditional
@@ -682,9 +708,10 @@ def apply_admin_terms(db, *, dry_run: bool = False) -> dict:
         applied += 1
         by_term[rule['term']] = by_term.get(rule['term'], 0) + 1
         if not dry_run:
+            # 追加前的 name_zh 就是专名，顺手写入 name_base
             db.execute(
-                'UPDATE geo_places SET name_zh=?, name_zh_hant=? WHERE id=?',
-                (new_zh, new_hant, row['id']),
+                'UPDATE geo_places SET name_zh=?, name_zh_hant=?, name_base=? WHERE id=?',
+                (new_zh, new_hant, row['name_zh'].strip(), row['id']),
             )
     if not dry_run:
         db.commit()

@@ -1,4 +1,4 @@
-# geo-registry 工程笔记
+# geotree 工程笔记
 
 ## 环境
 
@@ -19,6 +19,7 @@ python -X utf8 scripts/geo/apply_admin_terms.py                       # 通名�
 ## 数据约定
 
 - `name_zh`=简体，`name_zh_hant`=繁体（OpenCC 兜底，`zh`/`zh-CN`→简体，`zh-TW`/`zh-Hant` 系→繁体）
+- `name_base`=专名（剥掉通名）。ok_zh 行 `name_en` 为 NULL（ok_zh 源无英文名，专名存 `name_base`）；剥通名对易撞音译的单字通名（道/府/都/町/宗/岛）按国别限定，见 `admin_terms._TERM_COUNTRY`
 - `feature_class`/`feature_code` 是正式列；`admin2_code` 不再存 `H.MTN` 式特征标签
 - 自然特征 `level=8` + `is_selectable=FALSE`，不进级联选择器
 - 补名纪律：只写实有来源（alternateNames zh 标记/Wikidata zh label/CLDR/手工表），缺失留空不编造；UPDATE 一律带 `仅当空 OR name_zh=name_en` 守卫
@@ -29,4 +30,5 @@ python -X utf8 scripts/geo/apply_admin_terms.py                       # 通名�
 
 ## 实施记录
 
-见 `docs/Chatlog/2.md`。
+见 `docs/blogs/2026-10-26-我给世界地名库补了4.8万个中文名.md`。
+注：`docs/Chatlog/` 是外部 AI 对话记录，只读不改。
