@@ -66,6 +66,14 @@ def _ensure_local_name_schema(db):
     if _table_exists(db, 'geo_places') and not _column_exists(db, 'geo_places', 'name_base'):
         db.execute('ALTER TABLE geo_places ADD COLUMN name_base TEXT')
         db.execute('CREATE INDEX IF NOT EXISTS idx_geo_places_name_base ON geo_places(name_base)')
+    # GeoNames 源数据有但未入库的字段（countryInfo / allCountries 回填）
+    for col, ddl in (('latitude', 'DOUBLE PRECISION'),
+                     ('longitude', 'DOUBLE PRECISION'),
+                     ('area_km2', 'INTEGER'),
+                     ('capital', 'TEXT'),
+                     ('continent', 'CHAR(2)')):
+        if _table_exists(db, 'geo_places') and not _column_exists(db, 'geo_places', col):
+            db.execute(f'ALTER TABLE geo_places ADD COLUMN {col} {ddl}')
     db.execute(
         '''CREATE TABLE IF NOT EXISTS geo_place_names (
             place_id BIGINT NOT NULL REFERENCES geo_places(id) ON DELETE CASCADE,

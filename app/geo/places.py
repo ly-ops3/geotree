@@ -30,6 +30,9 @@ SCOPE_CN = 'cn'
 SCOPE_ABROAD = 'abroad'
 SCOPE_CN_GN = 'cn_gn'  # GeoNames 中国全量 gazetteer（探索用，与 ok_zh 资料栏分离）
 
+from app.geo.un_m49 import (CONTINENTS, SUBREGIONS, isos_of_subregion,
+                            region_of, region_names, subregions_of_continent)
+
 
 def geo_tables_ready(db) -> bool:
     return _table_exists(db, 'geo_places')
@@ -85,7 +88,8 @@ def _has_children(db, place_id):
 def _serialize_place_row(db, row):
     item = {
         'id': row['id'],
-        'level': row['level'],
+        'parent_id': row.get('parent_id'),
+        'level': row.get('level'),
         'display_name': place_display_name(row),
         'name_zh': row.get('name_zh'),
         'name_zh_hant': row.get('name_zh_hant'),
@@ -94,11 +98,29 @@ def _serialize_place_row(db, row):
         'name_local': row.get('name_local'),
         'name_local_lang': row.get('name_local_lang'),
         'iso_country': row.get('iso_country'),
-        'population': row.get('population'),
-        'feature': row.get('feature_code') or (row.get('admin2_code') if (row.get('level') or 0) >= 8 else None),
-        'has_children': _has_children(db, row['id']),
         'source': row.get('source'),
+        'source_id': row.get('source_id'),
+        'admin1_code': row.get('admin1_code'),
+        'admin2_code': row.get('admin2_code'),
+        'feature_class': row.get('feature_class'),
+        'feature_code': row.get('feature_code'),
+        'feature': row.get('feature_code') or (row.get('admin2_code') if (row.get('level') or 0) >= 8 else None),
+        'pinyin': row.get('pinyin'),
+        'population': row.get('population'),
+        'latitude': row.get('latitude'),
+        'longitude': row.get('longitude'),
+        'area_km2': row.get('area_km2'),
+        'capital': row.get('capital'),
+        'continent': row.get('continent'),
+        'deep_legacy': row.get('deep_legacy'),
+        'is_selectable': row.get('is_selectable'),
+        'sort_key': row.get('sort_key'),
+        'has_children': _has_children(db, row['id']),
     }
+    if row.get('level') == 1:
+        cont, sub = region_of(row.get('iso_country'))
+        item['continent_zh'], item['continent_en'] = region_names(cont, CONTINENTS)
+        item['subregion_zh'], item['subregion_en'] = region_names(sub, SUBREGIONS)
     return item
 
 
@@ -111,8 +133,48 @@ def _cn_tree_children(db, parent_id=None, scope=None) -> bool:
     return False
 
 
-def get_children(db, parent_id=None, scope=None, limit=2000):
+def _virtual_region_item(code, table, has_children=True):
+    zh, en = region_names(code, table)
+    return {
+        'id': -code,
+        'level': 0,
+        'display_name': f'{zh} ({en})' if zh != en else zh,
+        'name_zh': zh,
+        'name_en': en,
+        'name_local': None,
+        'iso_country': None,
+        'source': 'region',
+        'feature': 'region',
+        'has_children': has_children,
+        'virtual': True,
+    }
+
+
+def get_children(db, parent_id=None, scope=None, limit=2000, flat=False):
     if not geo_tables_ready(db):
+        return []
+    # 虚拟层级：abroad 根 → 大洲 → 地理区 → 国家（flat 时跳过，直接给国家列表）
+    if parent_id is None and scope == SCOPE_ABROAD and not flat:
+        return [_virtual_region_item(c, CONTINENTS) for c in CONTINENTS]
+    if parent_id is not None and parent_id < 0:
+        code = -parent_id
+        if code in CONTINENTS:
+            return [_virtual_region_item(s, SUBREGIONS)
+                    for s in subregions_of_continent(code)]
+        if code in SUBREGIONS:
+            isos = isos_of_subregion(code)
+            if not isos:
+                return []
+            marks = ','.join('?' for _ in isos)
+            rows = db.execute(
+                f"""SELECT p.* FROM geo_places p
+                    WHERE p.parent_id IS NULL AND p.source = 'geonames'
+                      AND p.level = 1 AND p.iso_country IN ({marks})
+                    ORDER BY p.sort_key NULLS LAST, p.name_zh NULLS LAST,
+                             p.name_en NULLS LAST, p.id""",
+                isos,
+            ).fetchall()
+            return [_serialize_place_row(db, dict(r)) for r in rows]
         return []
     params = [SOURCE_MACRO]
     clauses = ['(p.is_selectable = TRUE OR p.source = ?)']

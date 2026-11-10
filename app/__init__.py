@@ -38,6 +38,10 @@ def create_app():
         apply_schema(db)
         ensure_geo_places_schema(db)
 
+    @app.route('/', methods=['GET'])
+    def index():
+        return app.send_static_file('index.html')
+
     @app.route('/health', methods=['GET'])
     def health():
         from app.geo.places import geo_tables_ready

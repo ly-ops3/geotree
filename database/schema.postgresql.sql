@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS geo_places (
     deep_legacy SMALLINT,
     is_selectable BOOLEAN NOT NULL DEFAULT TRUE,
     population INTEGER,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    area_km2 INTEGER,
+    capital TEXT,
+    continent CHAR(2),
     sort_key TEXT,
     UNIQUE (source, source_id)
 );

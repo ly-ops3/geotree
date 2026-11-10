@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>geotree · 地名库浏览器</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f4f5f7; color: #24292f;
+  }
+  header {
+    background: #1f2937; color: #fff; padding: 12px 20px;
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  #stats { font-size: 12px; color: #9ca3af; }
+  main { max-width: 1400px; margin: 0 auto; padding: 16px; }
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .panel {
+    background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 14px;
+  }
+  .panel h2 { font-size: 14px; margin: 0 0 10px; color: #374151; }
+  .hint { font-size: 12px; color: #6b7280; margin: 6px 0 0; }
+  select, input[type=text], button {
+    font-size: 16px; min-height: 38px; border: 1px solid #d1d5db;
+    border-radius: 6px; padding: 6px 10px; background: #fff;
+  }
+  input[type=text] { width: 100%; }
+  button { cursor: pointer; background: #1f2937; color: #fff; border-color: #1f2937; }
+  button:hover { background: #374151; }
+  #cascade select { display: block; width: 100%; margin-top: 8px; }
+  .scope-row { display: flex; gap: 14px; font-size: 14px; margin-bottom: 4px; }
+  .scope-row label { display: flex; align-items: center; gap: 4px; min-height: 32px; }
+  #crumb { font-size: 12px; color: #1d4ed8; margin-top: 10px; word-break: break-all; }
+  .search-row { display: flex; gap: 8px; }
+  .search-row input { flex: 1; }
+  .result-list { margin-top: 8px; max-height: 60vh; overflow: auto; }
+  .result-item { padding: 8px 10px; border-bottom: 1px solid #f0f1f3; cursor: pointer; }
+  .result-item:hover { background: #f0f6ff; }
+  .result-item .name { font-size: 14px; }
+  .result-item .meta { font-size: 11px; color: #6b7280; margin-top: 2px; word-break: break-all; }
+  .result-item .path { color: #1d4ed8; }
+  .badge {
+    display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px;
+    background: #eef2ff; color: #4338ca; margin-left: 4px; vertical-align: 1px;
+  }
+  .badge.natural { background: #fef3c7; color: #92400e; }
+  #detail { margin-top: 14px; }
+  #detail table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #detail td {
+    border-top: 1px solid #f0f1f3; padding: 5px 8px; vertical-align: top;
+    word-break: break-all;
+  }
+  #detail td.k { width: 150px; color: #6b7280; white-space: nowrap; }
+
+  /* 通用表格组件 */
+  .dtable { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .dtable th, .dtable td { border: 1px solid #e5e7eb; padding: 4px 7px; text-align: left; }
+  .dtable thead th { position: sticky; top: 0; background: #f9fafb; user-select: none; }
+  .dtable thead th.sortable { cursor: pointer; }
+  .dtable thead th.sortable:hover { background: #eef2ff; }
+  .dtable thead th .arrow { color: #1d4ed8; font-size: 10px; }
+  .dtable thead input {
+    width: 100%; font-size: 11px; min-height: 24px; padding: 2px 5px;
+    border: 1px solid #e5e7eb; border-radius: 4px; font-weight: normal;
+  }
+  .dtable tbody tr:hover td { background: #f0f6ff; cursor: pointer; }
+  .dtable .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .err { color: #b91c1c; font-size: 12px; margin-top: 6px; }
+  .empty { color: #9ca3af; font-size: 12px; padding: 10px; }
+
+  /* ---------- 移动端钻取视图 ---------- */
+  #drill { display: none; }
+  .drill-top {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0; border-bottom: 1px solid #e5e7eb;
+    position: sticky; top: 0; background: #fff; z-index: 5;
+  }
+  .drill-back {
+    min-width: 40px; min-height: 36px; border: none; background: none;
+    font-size: 22px; color: #1d4ed8; padding: 0 4px;
+  }
+  .drill-title {
+    flex: 1; font-size: 13px; color: #374151; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .drill-pick {
+    font-size: 12px; min-height: 32px; padding: 4px 10px;
+    background: #eef2ff; color: #1d4ed8; border: 1px solid #c7d2fe;
+    border-radius: 16px; white-space: nowrap;
+  }
+  .sort-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 0; }
+  .sort-chips button {
+    min-height: 30px; font-size: 12px; padding: 3px 12px; border-radius: 15px;
+    background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb;
+  }
+  .sort-chips button.on { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+  .dgroup {
+    position: sticky; background: #f3f4f6; color: #6b7280;
+    font-size: 12px; font-weight: 600; padding: 4px 10px;
+  }
+  .drow {
+    display: flex; align-items: center; padding: 12px 10px;
+    border-bottom: 1px solid #f0f1f3; min-height: 44px;
+  }
+  .drow:active { background: #f0f6ff; }
+  .drow .nm { flex: 1; font-size: 15px; }
+  .drow .sub { font-size: 12px; color: #9ca3af; margin-right: 6px; }
+  .drow .go { color: #c9ced6; font-size: 18px; }
+
+  #tabbar { display: none; }
+
+  /* ---------- 移动端：底部 App 式页签 ---------- */
+  @media (max-width: 900px) {
+    main { padding: 10px 10px 70px; }
+    .panels { display: block; }
+    .panel { display: none; border: none; border-radius: 0; padding: 4px 0; }
+    .panel.active { display: block; }
+    #detail { margin-top: 0; }
+    .result-list { max-height: none; }
+    #cascade, #crumb, .desktop-only { display: none !important; }
+    #drill { display: block; }
+    #tabbar {
+      display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+      background: #fff; border-top: 1px solid #e1e4e8;
+    }
+    #tabbar button {
+      flex: 1; border: none; border-radius: 0; background: #fff; color: #6b7280;
+      font-size: 12px; min-height: 52px; padding: 4px 0;
+    }
+    #tabbar button.active { color: #1d4ed8; font-weight: 600; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>geotree · 地名库浏览器</h1>
+  <span id="stats">加载统计…</span>
+</header>
+<main>
+  <div class="panels">
+    <section class="panel active" id="p-cascade">
+      <h2 class="desktop-only">级联浏览</h2>
+      <div class="scope-row">
+        <label><input type="radio" name="scope" value="cn" checked> 中国</label>
+        <label><input type="radio" name="scope" value="abroad"> 国外</label>
+      </div>
+      <div id="cascade"></div>
+      <div id="crumb"></div>
+      <div id="drill"></div>
+      <p class="hint desktop-only">逐级下钻；选中任意节点显示详情。单项层级自动跳过。</p>
+    </section>
+
+    <section class="panel" id="p-search">
+      <h2>名称搜索</h2>
+      <div class="search-row">
+        <input type="text" id="q" placeholder="中/英文名，支持 pinyin、country:jp 语法">
+        <select id="search-scope">
+          <option value="">全部</option>
+          <option value="cn">中国</option>
+          <option value="abroad">国外</option>
+          <option value="cn_gn">cn_gn</option>
+        </select>
+      </div>
+      <div class="result-list" id="search-results"></div>
+      <p class="hint">支持搜索语法：多个词空格分隔、双引号精确、"deep:3"、"country:us"。</p>
+    </section>
+
+    <section class="panel" id="p-resolve">
+      <h2>自由文本解析</h2>
+      <div class="search-row">
+        <input type="text" id="resolve-text" placeholder='如 "浙江省杭州市西湖区文三路"'>
+        <button id="resolve-btn">解析</button>
+      </div>
+      <div id="resolve-result" class="result-list"></div>
+      <p class="hint">把脏地址结构化 → place_id + 剩余文本（门牌号等）。</p>
+    </section>
+
+    <section class="panel" id="p-countries">
+      <h2>国家一览</h2>
+      <div class="result-list" id="countries-box"><div class="empty">加载中…</div></div>
+      <p class="hint">点表头排序，表头下输入框按列筛选。人口为 GeoNames 快照值，仅供参考。</p>
+    </section>
+
+    <section class="panel" id="detail">
+      <h2>节点详情</h2>
+      <div id="detail-body"><div class="empty">尚未选择节点</div></div>
+    </section>
+  </div>
+</main>
+
+<nav id="tabbar">
+  <button data-tab="p-cascade" class="active">级联</button>
+  <button data-tab="p-search">搜索</button>
+  <button data-tab="p-resolve">解析</button>
+  <button data-tab="p-countries">国家</button>
+  <button data-tab="detail">详情</button>
+</nav>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MOBILE = matchMedia('(max-width: 900px)').matches;
+
+async function api(path) {
+  const r = await fetch(path);
+  if (!r.ok) {
+    let msg = 'HTTP ' + r.status;
+    try { const j = await r.json(); msg = j.msg || j.message || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+/* ================= 通用可排序/筛选表格 ================= */
+function makeTable(container, columns, rows, onRowClick) {
+  const state = { sortKey: null, sortDir: 1, filters: {} };
+  function viewRows() {
+    let out = rows.filter(r => columns.every(c => {
+      const f = (state.filters[c.key] || '').trim().toLowerCase();
+      if (!f) return true;
+      return String(r[c.key] ?? '').toLowerCase().includes(f);
+    }));
+    if (state.sortKey) {
+      const col = columns.find(c => c.key === state.sortKey);
+      const num = col && col.numeric;
+      out = out.slice().sort((a, b) => {
+        let va = a[state.sortKey], vb = b[state.sortKey];
+        if (va == null) return 1; if (vb == null) return -1;
+        if (num) return (Number(va) - Number(vb)) * state.sortDir;
+        return String(va).localeCompare(String(vb), 'zh') * state.sortDir;
+      });
+    }
+    return out;
+  }
+  function render() {
+    const data = viewRows();
+    container.innerHTML = '<table class="dtable"><thead><tr>' +
+      columns.map(c => {
+        const arrow = state.sortKey !== c.key ? '' :
+          (state.sortDir > 0 ? ' <span class="arrow">▲</span>' : ' <span class="arrow">▼</span>');
+        return `<th class="sortable" data-key="${c.key}">${esc(c.label)}${arrow}</th>`;
+      }).join('') + '</tr><tr>' +
+      columns.map(c =>
+        `<th><input data-fkey="${c.key}" value="${esc(state.filters[c.key] || '')}" placeholder="筛选"></th>`
+      ).join('') + '</tr></thead><tbody>' +
+      (data.length ? data.map((r, i) => '<tr data-i="' + i + '">' +
+        columns.map(c =>
+          `<td class="${c.numeric ? 'num' : ''}">${c.render ? c.render(r) : esc(r[c.key] ?? '')}</td>`
+        ).join('') + '</tr>').join('')
+       : `<tr><td colspan="${columns.length}"><div class="empty">无匹配行</div></td></tr>`) +
+      '</tbody></table>';
+    const dataRef = data;
+    container.querySelectorAll('th.sortable').forEach(th => {
+      th.onclick = () => {
+        const k = th.dataset.key;
+        if (state.sortKey !== k) { state.sortKey = k; state.sortDir = 1; }
+        else if (state.sortDir > 0) { state.sortDir = -1; }
+        else { state.sortKey = null; state.sortDir = 1; }
+        render();
+      };
+    });
+    container.querySelectorAll('input[data-fkey]').forEach(inp => {
+      inp.oninput = () => { state.filters[inp.dataset.fkey] = inp.value; render(); };
+    });
+    if (onRowClick) container.querySelectorAll('tbody tr[data-i]').forEach(tr => {
+      tr.onclick = () => onRowClick(dataRef[Number(tr.dataset.i)]);
+    });
+  }
+  render();
+}
+
+/* ---------- 页签 ---------- */
+function switchTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === id));
+  document.querySelectorAll('#tabbar button').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === id));
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('#tabbar button').forEach(b => {
+  b.onclick = () => switchTab(b.dataset.tab);
+});
+
+/* ---------- stats ---------- */
+api('/api/geo/stats').then(d => {
+  if (!d.ready) { $('stats').textContent = '地理数据未导入'; return; }
+  const src = (d.by_source || []).map(s => `${s.source}:${s.count}`).join('  ');
+  $('stats').textContent = `共 ${d.total} 条 ｜ ${src}`;
+}).catch(() => { $('stats').textContent = ''; });
+
+/* ---------- detail ---------- */
+const FIELD_ORDER = [
+  'id', 'parent_id', 'level', 'display_name', 'name_zh', 'name_zh_hant',
+  'name_base', 'name_en', 'name_local', 'name_local_lang',
+  'iso_country', 'continent', 'continent_zh', 'subregion_zh',
+  'source', 'source_id', 'admin1_code', 'admin2_code',
+  'feature_class', 'feature_code', 'feature', 'pinyin', 'population',
+  'area_km2', 'capital', 'latitude', 'longitude',
+  'deep_legacy', 'is_selectable', 'sort_key', 'has_children',
+];
+
+function renderDetailTable(it, pathText) {
+  const keys = FIELD_ORDER.filter(k => k in it)
+    .concat(Object.keys(it).filter(k => !FIELD_ORDER.includes(k) && k !== 'names'));
+  let html = '<table>' +
+    (pathText ? `<tr><td class="k">路径</td><td>${esc(pathText)}</td></tr>` : '') +
+    keys.map(k => {
+      const v = it[k];
+      const shown = (v === null || v === undefined || v === '')
+        ? '<i style="color:#c9ced6">—</i>' : esc(v);
+      return `<tr><td class="k">${esc(k)}</td><td>${shown}</td></tr>`;
+    }).join('') + '</table>';
+  if (it.names && it.names.length) {
+    html += '<h2 style="margin-top:10px">多语言别名</h2><div id="names-table-box"></div>';
+  }
+  $('detail-body').innerHTML = html;
+  if (it.names && it.names.length) {
+    makeTable($('names-table-box'),
+      [{key: 'lang_code', label: 'lang'}, {key: 'name', label: 'name'},
+       {key: 'is_preferred', label: 'preferred'}],
+      it.names, null);
+  }
+}
+
+function pickNode(item) {
+  if (!item) return;
+  if (item.id < 0) { switchTab('detail'); renderDetailTable(item, null); }
+  else showDetail(item.id);
+}
+
+async function showDetail(placeId) {
+  const body = $('detail-body');
+  body.innerHTML = '<div class="empty">加载中…</div>';
+  switchTab('detail');
+  try {
+    const [d, p] = await Promise.all([
+      api('/api/places/' + placeId),
+      api('/api/geo/regions/' + placeId + '/path'),
+    ]);
+    const path = (p.path || []).map(n => n.display_name).join(' / ');
+    renderDetailTable(d.place || {}, path);
+  } catch (e) {
+    body.innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+  }
+}
+
+/* ================= 级联：桌面下拉 ================= */
+const cascade = $('cascade'), crumb = $('crumb');
+let levelSelects = [];
+let chain = [];
+
+function currentScope() {
+  return document.querySelector('input[name=scope]:checked').value;
+}
+function updateCrumb() {
+  crumb.textContent = chain.filter(Boolean).map(i => i.display_name).join(' / ');
+}
+
+async function fetchChildren(parentId, scope) {
+  const url = parentId == null
+    ? '/api/geo/regions?scope=' + scope
+    : '/api/geo/regions?parent_id=' + parentId;
+  return (await api(url)).items || [];
+}
+
+async function loadLevel(depth, parentId) {
+  chain.length = depth;
+  let items;
+  try { items = await fetchChildren(parentId, currentScope()); }
+  catch (e) {
+    const div = document.createElement('div');
+    div.className = 'err'; div.textContent = e.message;
+    cascade.appendChild(div); return;
+  }
+  if (!items.length) return;
+  if (items.length === 1) {
+    chain[depth] = items[0];
+    updateCrumb();
+    if (items[0].has_children) loadLevel(depth + 1, items[0].id);
+    return;
+  }
+  const sel = document.createElement('select');
+  sel.innerHTML = '<option value="">— 请选择 —</option>' +
+    items.map(i => `<option value="${i.id}">${esc(i.display_name)}</option>`).join('');
+  sel._items = items;
+  sel.onchange = () => onCascadeChange(depth);
+  cascade.appendChild(sel);
+  levelSelects[depth] = sel;
+}
+
+function onCascadeChange(depth) {
+  while (levelSelects.length > depth + 1) levelSelects.pop().remove();
+  chain.length = depth + 1;
+  const sel = levelSelects[depth];
+  const item = (sel._items || []).find(i => String(i.id) === sel.value);
+  chain[depth] = item || undefined;
+  updateCrumb();
+  if (!item) return;
+  pickNode(item);
+  if (item.has_children) loadLevel(depth + 1, item.id);
+}
+
+/* ================= 级联：移动端全屏钻取 ================= */
+const CN_REGION = {'1':'华北','2':'东北','3':'华东','4':'中南','5':'西南','6':'西北','7':'港澳台','8':'港澳台'};
+let drillStack = [];   // [{node, items}]
+let drillSort = 'default';
+
+function drillOptions(items) {
+  if (items.length && items[0].virtual) return [];   // 大洲/地理区固定顺序
+  const any = f => items.some(i => i[f] !== null && i[f] !== undefined && i[f] !== '');
+  const opts = [{key:'default', label:'默认'}];
+  if (items.some(i => i.source === 'ok_zh')) opts.push({key:'code', label:'编码'});
+  if (any('pinyin')) opts.push({key:'pinyin', label:'拼音'});
+  opts.push({key:'zh', label:'中文'});
+  if (any('name_en')) opts.push({key:'en', label:'英文'});
+  if (any('population')) opts.push({key:'pop', label:'人口'});
+  if (any('area_km2')) opts.push({key:'area', label:'面积'});
+  return opts;
+}
+
+function drillSortGroup(items, mode) {
+  // 返回 [{label, rows}]
+  const sortNum = (a, b, k) => (a[k] ?? 0) - (b[k] ?? 0);
+  switch (mode) {
+    case 'code': {
+      const groups = {};
+      items.forEach(i => {
+        const g = CN_REGION[String(i.source_id || '')[0]] || '其他';
+        (groups[g] = groups[g] || []).push(i);
+      });
+      const order = ['华北','东北','华东','中南','西南','西北','港澳台','其他'];
+      return order.filter(g => groups[g])
+        .map(g => ({label: g, rows: groups[g].sort((a, b) =>
+          String(a.source_id).padStart(12, '0').localeCompare(String(b.source_id).padStart(12, '0')))}));
+    }
+    case 'pinyin': {
+      const groups = {};
+      items.slice().sort((a, b) => (a.pinyin || '').localeCompare(b.pinyin || ''))
+        .forEach(i => {
+          const g = ((i.pinyin || '#')[0] || '#').toUpperCase();
+          (groups[g] = groups[g] || []).push(i);
+        });
+      return Object.keys(groups).sort().map(g => ({label: g, rows: groups[g]}));
+    }
+    case 'en': {
+      const groups = {};
+      items.slice().sort((a, b) => (a.name_en || 'ZZZ').localeCompare(b.name_en || 'ZZZ'))
+        .forEach(i => {
+          const g = ((i.name_en || '#')[0] || '#').toUpperCase();
+          (groups[g] = groups[g] || []).push(i);
+        });
+      return Object.keys(groups).sort().map(g => ({label: g, rows: groups[g]}));
+    }
+    case 'zh':
+      return [{label: null, rows: items.slice().sort((a, b) =>
+        (a.name_zh || a.display_name || '').localeCompare(b.name_zh || b.display_name || '', 'zh'))}];
+    case 'pop':
+      return [{label: null, rows: items.slice().sort((a, b) => (b.population ?? -1) - (a.population ?? -1))}];
+    case 'area':
+      return [{label: null, rows: items.slice().sort((a, b) => (b.area_km2 ?? -1) - (a.area_km2 ?? -1))}];
+    default:
+      return [{label: null, rows: items}];
+  }
+}
+
+function drillSubLabel(item, mode) {
+  if (mode === 'pop' && item.population != null) return item.population.toLocaleString();
+  if (mode === 'area' && item.area_km2 != null) return item.area_km2.toLocaleString() + ' km²';
+  if (mode === 'code' && item.source_id) return item.source_id;
+  return item.name_en && item.name_zh && item.name_en !== item.name_zh ? item.name_en : '';
+}
+
+function renderDrill() {
+  const box = $('drill');
+  const top = drillStack[drillStack.length - 1];
+  const title = drillStack.map(s => s.node ? s.node.display_name : (currentScope() === 'cn' ? '中国' : '国外'))
+    .filter(Boolean).join(' › ') || '请选择';
+  const opts = drillOptions(top.items);
+  if (!opts.some(o => o.key === drillSort)) drillSort = 'default';
+  const groups = drillSortGroup(top.items, drillSort);
+
+  let html = '<div class="drill-top">' +
+    (drillStack.length > 1 ? '<button class="drill-back">‹</button>' : '') +
+    `<div class="drill-title">${esc(title)}</div>` +
+    (top.node ? `<button class="drill-pick">就选「${esc(top.node.name_zh || top.node.display_name)}」</button>` : '') +
+    '</div>';
+  if (opts.length > 1) {
+    html += '<div class="sort-chips">' +
+      opts.map(o => `<button data-k="${o.key}" class="${o.key === drillSort ? 'on' : ''}">${o.label}</button>`).join('') +
+      '</div>';
+  }
+  groups.forEach(g => {
+    if (g.label) html += `<div class="dgroup">${esc(g.label)}</div>`;
+    g.rows.forEach(item => {
+      const sub = drillSubLabel(item, drillSort);
+      html += `<div class="drow" data-id="${item.id}"><div class="nm">${esc(item.display_name)}</div>` +
+        (sub ? `<div class="sub">${esc(sub)}</div>` : '') +
+        (item.has_children ? '<div class="go">›</div>' : '') + '</div>';
+    });
+  });
+  box.innerHTML = html;
+
+  const back = box.querySelector('.drill-back');
+  if (back) back.onclick = () => { drillStack.pop(); drillSort = 'default'; renderDrill(); };
+  const pick = box.querySelector('.drill-pick');
+  if (pick) pick.onclick = () => pickNode(top.node);
+  box.querySelectorAll('.sort-chips button').forEach(b => {
+    b.onclick = () => { drillSort = b.dataset.k; renderDrill(); };
+  });
+  box.querySelectorAll('.drow').forEach(row => {
+    const item = top.items.find(i => String(i.id) === row.dataset.id);
+    row.onclick = () => onDrillRow(item);
+  });
+}
+
+async function onDrillRow(item) {
+  if (!item) return;
+  if (item.has_children) {
+    drillStack.push({node: item, items: await fetchChildren(item.id)});
+    drillSort = 'default';
+    renderDrill();
+  } else {
+    pickNode(item);
+  }
+}
+
+async function drillInit() {
+  drillStack = [];
+  drillSort = 'default';
+  let items = await fetchChildren(null, currentScope());
+  // 单项层级自动跳过（中国 → 直接列省）
+  const skipped = [];
+  while (items.length === 1 && items[0].has_children) {
+    skipped.push(items[0]);
+    items = await fetchChildren(items[0].id);
+  }
+  const node = skipped.length ? skipped[skipped.length - 1] : null;
+  // node 表示"当前列表的父节点"；skipped 中间层并入路径显示
+  drillStack = [{node, items, skipped}];
+  renderDrill();
+}
+
+/* scope 切换 */
+document.querySelectorAll('input[name=scope]').forEach(r => {
+  r.onchange = () => {
+    if (MOBILE) { drillInit(); return; }
+    levelSelects.forEach(s => s.remove());
+    levelSelects = []; chain = [];
+    cascade.innerHTML = ''; crumb.textContent = '';
+    loadLevel(0, null);
+  };
+});
+
+if (MOBILE) drillInit(); else loadLevel(0, null);
+
+/* ---------- search ---------- */
+let debounceTimer = null;
+$('q').addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(doSearch, 300);
+});
+$('search-scope').addEventListener('change', doSearch);
+
+async function doSearch() {
+  const q = $('q').value.trim();
+  const box = $('search-results');
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="empty">搜索中…</div>';
+  try {
+    const scope = $('search-scope').value;
+    const d = await api('/api/geo/regions/search?q=' + encodeURIComponent(q)
+      + '&limit=30' + (scope ? '&scope=' + scope : ''));
+    const items = d.items || [];
+    if (!items.length) { box.innerHTML = '<div class="empty">无结果</div>'; return; }
+    box.innerHTML = '';
+    items.forEach(i => {
+      const div = document.createElement('div');
+      div.className = 'result-item';
+      const natural = (i.level || 0) >= 8;
+      div.innerHTML =
+        `<div class="name">${esc(i.display_name)}` +
+        `<span class="badge">L${i.level}</span>` +
+        (i.feature_code ? `<span class="badge${natural ? ' natural' : ''}">${esc(i.feature_code)}</span>` : '') +
+        `</div>` +
+        `<div class="meta"><span class="path">${esc(i.path_label || '')}</span>` +
+        ` · id ${i.id} · ${esc(i.iso_country || '')} · ${esc(i.source || '')}</div>`;
+      div.onclick = () => showDetail(i.id);
+      box.appendChild(div);
+    });
+    if (d.has_more) {
+      const more = document.createElement('div');
+      more.className = 'empty';
+      more.textContent = '还有更多结果，请缩小范围';
+      box.appendChild(more);
+    }
+  } catch (e) {
+    box.innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+  }
+}
+
+/* ---------- resolve ---------- */
+async function doResolve() {
+  const text = $('resolve-text').value.trim();
+  const box = $('resolve-result');
+  if (!text) return;
+  box.innerHTML = '<div class="empty">解析中…</div>';
+  try {
+    const d = await api('/api/geo/resolve?text=' + encodeURIComponent(text));
+    if (d.matched) {
+      const path = (d.path || []).map(n => n.display_name).join(' / ');
+      let html = `<div class="result-item"><div class="name">` +
+        (d.place_id ? `place_id = ${d.place_id}` : `scope = ${esc(d.scope)}`) +
+        `</div><div class="meta"><span class="path">${esc(path)}</span></div>`;
+      if (d.extra_text)
+        html += `<div class="meta">剩余文本：${esc(d.extra_text)}</div>`;
+      html += `<div class="meta">→ 查看节点详情</div></div>`;
+      box.innerHTML = html;
+      if (d.place_id) box.querySelector('.result-item').onclick = () => showDetail(d.place_id);
+    } else {
+      box.innerHTML = '<div class="empty">未能匹配</div>';
+    }
+  } catch (e) {
+    box.innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+  }
+}
+$('resolve-btn').onclick = doResolve;
+$('resolve-text').addEventListener('keydown', e => { if (e.key === 'Enter') doResolve(); });
+
+/* ---------- countries ---------- */
+let countriesCache = null;
+async function loadCountries() {
+  if (countriesCache) return;
+  try {
+    const d = await api('/api/geo/regions?scope=abroad&flat=1');
+    countriesCache = d.items || [];
+    renderCountries();
+  } catch (e) {
+    $('countries-box').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+  }
+}
+function renderCountries() {
+  makeTable($('countries-box'), [
+    {key: 'name_zh', label: '中文名'},
+    {key: 'name_en', label: '英文名'},
+    {key: 'iso_country', label: 'ISO'},
+    {key: 'continent_zh', label: '大洲'},
+    {key: 'subregion_zh', label: '地理区'},
+    {key: 'capital', label: '首都'},
+    {key: 'population', label: '人口', numeric: true},
+    {key: 'area_km2', label: '面积km²', numeric: true},
+  ], countriesCache, r => showDetail(r.id));
+}
+loadCountries();
+</script>
+</body>
+</html>

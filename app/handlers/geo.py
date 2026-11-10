@@ -112,7 +112,8 @@ def list_regions():
     lang, err = _requested_lang()
     if err:
         return err
-    items = get_children(db, parent_id=parent_id, scope=scope or None)
+    flat = str(request.args.get('flat') or '').lower() in ('1', 'true', 'yes')
+    items = get_children(db, parent_id=parent_id, scope=scope or None, flat=flat)
     if lang:
         localize_items(db, items, lang)
     return api_success({'items': items}, legacy={'items': items})
